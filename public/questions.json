@@ -1,0 +1,15 @@
+{
+    "questions": [
+        {
+            "q": "Které město je sídlem Ústavního soudu ČR?",
+            "options": [
+                "Praha",
+                "Brno",
+                "Olomouc",
+                "Plzeň"
+            ],
+            "answer": 1,
+            "explanation": "Ústavní soud sídlí v Brně."
+        }
+    ]
+}
