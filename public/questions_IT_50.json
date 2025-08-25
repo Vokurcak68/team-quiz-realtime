@@ -1,0 +1,604 @@
+{
+  "questions": [
+    {
+      "q": "Které město je sídlem Ústavního soudu ČR?",
+      "options": [
+        "Praha",
+        "Brno",
+        "Olomouc",
+        "Plzeň"
+      ],
+      "answer": 1,
+      "explanation": "Ústavní soud sídlí v Brně.",
+      "comment": ""
+    },
+    {
+      "q": "Který autor zavedl do světa slovo „robot“?",
+      "options": [
+        "Karel Čapek",
+        "Jan Neruda",
+        "Bohumil Hrabal",
+        "Milan Kundera"
+      ],
+      "answer": 0,
+      "explanation": "Slovo se objevilo v dramatu R.U.R. (1920).",
+      "comment": ""
+    },
+    {
+      "q": "V kterém roce byla založena Univerzita Karlova?",
+      "options": [
+        "1348",
+        "1212",
+        "1400",
+        "1492"
+      ],
+      "answer": 0,
+      "explanation": "Univerzitu založil Karel IV. v roce 1348.",
+      "comment": ""
+    },
+    {
+      "q": "Největší rybník v ČR je…",
+      "options": [
+        "Bezdrev",
+        "Rožmberk",
+        "Svět",
+        "Nesyt"
+      ],
+      "answer": 1,
+      "explanation": "Rybník Rožmberk na Třeboňsku.",
+      "comment": ""
+    },
+    {
+      "q": "Na které řece leží přehrada Orlík?",
+      "options": [
+        "Vltava",
+        "Labe",
+        "Morava",
+        "Ohře"
+      ],
+      "answer": 0,
+      "explanation": "Vodní dílo Orlík je na Vltavě.",
+      "comment": ""
+    },
+    {
+      "q": "Které město je zapsáno v UNESCO díky vile Tugendhat?",
+      "options": [
+        "Brno",
+        "Zlín",
+        "Praha",
+        "Liberec"
+      ],
+      "answer": 0,
+      "explanation": "Funkcionalistická vila Tugendhat stojí v Brně.",
+      "comment": ""
+    },
+    {
+      "q": "Kde leží propast Macocha?",
+      "options": [
+        "Moravský kras",
+        "České Švýcarsko",
+        "Broumovsko",
+        "Beskydy"
+      ],
+      "answer": 0,
+      "explanation": "Macocha je součást Moravského krasu.",
+      "comment": ""
+    },
+    {
+      "q": "Které pohoří je domovem Černého jezera?",
+      "options": [
+        "Krkonoše",
+        "Šumava",
+        "Jeseníky",
+        "Jizerské hory"
+      ],
+      "answer": 1,
+      "explanation": "Černé jezero leží na Šumavě.",
+      "comment": ""
+    },
+    {
+      "q": "Který kraj má sídlo ve Zlíně?",
+      "options": [
+        "Moravskoslezský",
+        "Zlínský",
+        "Olomoucký",
+        "Jihomoravský"
+      ],
+      "answer": 1,
+      "explanation": "Krajské město Zlín – Zlínský kraj.",
+      "comment": ""
+    },
+    {
+      "q": "Který typ horniny tvoří Adršpašsko‑teplické skály?",
+      "options": [
+        "Žula",
+        "Pískovec",
+        "Vápenec",
+        "Čedič"
+      ],
+      "answer": 1,
+      "explanation": "Jde o pískovcové skalní město.",
+      "comment": ""
+    },
+    {
+      "q": "Jaká je průměrná časová složitost quicksortu?",
+      "options": [
+        "O(n)",
+        "O(n log n)",
+        "O(n^2)",
+        "O(log n)"
+      ],
+      "answer": 1,
+      "explanation": "Průměrně O(n log n), v nejhorším O(n^2).",
+      "comment": ""
+    },
+    {
+      "q": "Který HTTP kód znamená „Too Many Requests“?",
+      "options": [
+        "403",
+        "408",
+        "409",
+        "429"
+      ],
+      "answer": 3,
+      "explanation": "Limit počtu požadavků: 429.",
+      "comment": "Správně"
+    },
+    {
+      "q": "Který protokol běží standardně na portu 22?",
+      "options": [
+        "SSH",
+        "HTTPS",
+        "SMTP",
+        "DNS"
+      ],
+      "answer": 0,
+      "explanation": "SSH používá TCP port 22.",
+      "comment": ""
+    },
+    {
+      "q": "Která metoda HTTP není idempotentní?",
+      "options": [
+        "GET",
+        "PUT",
+        "DELETE",
+        "POST"
+      ],
+      "answer": 3,
+      "explanation": "POST typicky vytváří zdroje – není idempotentní.",
+      "comment": "Skvělé"
+    },
+    {
+      "q": "V ACID znamená písmeno I…",
+      "options": [
+        "Isolation",
+        "Indexing",
+        "Integrity (checksum)",
+        "Iteration"
+      ],
+      "answer": 0,
+      "explanation": "Atomicity, Consistency, Isolation, Durability.",
+      "comment": ""
+    },
+    {
+      "q": "Jak dlouhá je IPv6 adresa (v bitech)?",
+      "options": [
+        "32",
+        "64",
+        "128",
+        "256"
+      ],
+      "answer": 2,
+      "explanation": "IPv6 má 128 bitů.",
+      "comment": ""
+    },
+    {
+      "q": "Který příkaz Git přepisuje historii (např. squash) a na sdílených branchech se doporučuje opatrnost?",
+      "options": [
+        "git revert",
+        "git rebase",
+        "git fetch",
+        "git tag"
+      ],
+      "answer": 1,
+      "explanation": "Rebase mění historii commitů.",
+      "comment": ""
+    },
+    {
+      "q": "Který typ indexu v SQL je vhodný pro intervalové dotazy (<, BETWEEN)?",
+      "options": [
+        "Hash index",
+        "B‑tree",
+        "Bitmap",
+        "Full‑text"
+      ],
+      "answer": 1,
+      "explanation": "B‑tree udržuje uspořádání klíčů.",
+      "comment": ""
+    },
+    {
+      "q": "Kolika‑krokový je úvodní TCP handshake?",
+      "options": [
+        "2",
+        "3",
+        "4",
+        "5"
+      ],
+      "answer": 1,
+      "explanation": "SYN → SYN/ACK → ACK – třícestný handshake.",
+      "comment": "Aha"
+    },
+    {
+      "q": "Jaká je časová složitost binárního vyhledávání?",
+      "options": [
+        "O(n)",
+        "O(n log n)",
+        "O(log n)",
+        "O(1)"
+      ],
+      "answer": 2,
+      "explanation": "Binární vyhledávání je O(log n).",
+      "comment": ""
+    },
+    {
+      "q": "Které město je sídlem Nejvyššího soudu ČR?",
+      "options": [
+        "Praha",
+        "Brno",
+        "Olomouc",
+        "Hradec Králové"
+      ],
+      "answer": 1,
+      "explanation": "Nejvyšší soud sídlí v Brně.",
+      "comment": ""
+    },
+    {
+      "q": "Ve kterém městě se stékají Labe a Vltava?",
+      "options": [
+        "Kolín",
+        "Mělník",
+        "Litoměřice",
+        "Ústí nad Labem"
+      ],
+      "answer": 1,
+      "explanation": "Soutok Labe a Vltavy je v Mělníku.",
+      "comment": ""
+    },
+    {
+      "q": "Který národní park je největší v ČR?",
+      "options": [
+        "Krkonošský NP",
+        "NP Podyjí",
+        "NP Šumava",
+        "NP České Švýcarsko"
+      ],
+      "answer": 2,
+      "explanation": "Největší rozlohu má Šumava.",
+      "comment": ""
+    },
+    {
+      "q": "Které město je centrem automobilky Škoda Auto?",
+      "options": [
+        "Kvasiny",
+        "Mladá Boleslav",
+        "Plzeň",
+        "Ostrava"
+      ],
+      "answer": 1,
+      "explanation": "Sídlo Škoda Auto je v Mladé Boleslavi.",
+      "comment": ""
+    },
+    {
+      "q": "Který hrad založil Karel IV. jako reprezentační pro korunní klenoty?",
+      "options": [
+        "Karlštejn",
+        "Křivoklát",
+        "Loket",
+        "Bezděz"
+      ],
+      "answer": 0,
+      "explanation": "Karlštejn sloužil k uchování klenotů.",
+      "comment": ""
+    },
+    {
+      "q": "Kde najdeme propast na dně, kterou protéká říčka Punkva?",
+      "options": [
+        "Koněpruské jeskyně",
+        "Punkevní jeskyně",
+        "Bozkovské jeskyně",
+        "Javoříčské jeskyně"
+      ],
+      "answer": 1,
+      "explanation": "Punkevní jeskyně, Moravský kras.",
+      "comment": ""
+    },
+    {
+      "q": "Nejvyšší vrchol Jeseníků je…",
+      "options": [
+        "Praděd",
+        "Keprník",
+        "Šerák",
+        "Šerlich"
+      ],
+      "answer": 0,
+      "explanation": "Praděd (1491 m).",
+      "comment": ""
+    },
+    {
+      "q": "Které město je centrem Hané a proslulé orlojem?",
+      "options": [
+        "Olomouc",
+        "Opava",
+        "Prostějov",
+        "Hranice"
+      ],
+      "answer": 0,
+      "explanation": "Olomouc a její barokní sloup + orloj.",
+      "comment": "Gratulace"
+    },
+    {
+      "q": "Které město je známé Baťovým mrakodrapem (budova 21)?",
+      "options": [
+        "Zlín",
+        "Brno",
+        "Ostrava",
+        "Pardubice"
+      ],
+      "answer": 0,
+      "explanation": "Funkcionalistická budova 21 ve Zlíně.",
+      "comment": ""
+    },
+    {
+      "q": "Jak se jmenuje největší přehrada v ČR podle plochy?",
+      "options": [
+        "Orlík",
+        "Lipno",
+        "Slapy",
+        "Nechranice"
+      ],
+      "answer": 1,
+      "explanation": "Největší plochu má Lipno.",
+      "comment": ""
+    },
+    {
+      "q": "Který jazyk je češtině geneticky nejbližší?",
+      "options": [
+        "Polština",
+        "Slovenština",
+        "Lužická srbština",
+        "Ukrajinština"
+      ],
+      "answer": 1,
+      "explanation": "Čeština a slovenština jsou si nejbližší.",
+      "comment": ""
+    },
+    {
+      "q": "Ve kterém městě sídlí Ústav pro studium totalitních režimů?",
+      "options": [
+        "Brno",
+        "Ostrava",
+        "Praha",
+        "Plzeň"
+      ],
+      "answer": 2,
+      "explanation": "ÚSTR sídlí v Praze.",
+      "comment": ""
+    },
+    {
+      "q": "Který zámek je součástí Lednicko‑valtického areálu UNESCO?",
+      "options": [
+        "Hluboká",
+        "Lednice",
+        "Sychrov",
+        "Kuks"
+      ],
+      "answer": 1,
+      "explanation": "Zámek Lednice.",
+      "comment": "Klíčové"
+    },
+    {
+      "q": "Která řeka protéká Olomoucí?",
+      "options": [
+        "Morava",
+        "Jihlava",
+        "Dyje",
+        "Opava"
+      ],
+      "answer": 0,
+      "explanation": "Centrem města protéká Morava.",
+      "comment": ""
+    },
+    {
+      "q": "Jak se nazývá nejvyšší vodopád v ČR?",
+      "options": [
+        "Labský vodopád",
+        "Pančavský vodopád",
+        "Vodopád Jedlová",
+        "Bílá Opava"
+      ],
+      "answer": 1,
+      "explanation": "Pančavský vodopád v Krkonoších.",
+      "comment": ""
+    },
+    {
+      "q": "Který algoritmus najde nejkratší cesty v grafu s nezápornými váhami?",
+      "options": [
+        "Bellman‑Ford",
+        "Dijkstra",
+        "Floyd‑Warshall",
+        "Prim"
+      ],
+      "answer": 1,
+      "explanation": "Dijkstra s vhodnou prioritní frontou.",
+      "comment": "Tip"
+    },
+    {
+      "q": "Co zajišťuje DNSSEC?",
+      "options": [
+        "Šifrování obsahu DNS",
+        "Autenticitu záznamů DNS",
+        "Rychlejší rekurzi",
+        "Load‑balancing"
+      ],
+      "answer": 1,
+      "explanation": "Podepisování záznamů – integrita a autenticita.",
+      "comment": "Pozor"
+    },
+    {
+      "q": "Který HTTP kód značí přesměrování „See Other“?",
+      "options": [
+        "301",
+        "302",
+        "303",
+        "307"
+      ],
+      "answer": 2,
+      "explanation": "303 See Other.",
+      "comment": ""
+    },
+    {
+      "q": "Jaký je rozdíl mezi git merge a git rebase?",
+      "options": [
+        "Merge přepisuje historii, rebase ji zachová",
+        "Rebase vytváří nový lineární průběh commitů",
+        "Obojí dělá totéž",
+        "Rebase vytváří merge commit"
+      ],
+      "answer": 1,
+      "explanation": "Rebase přehrává commity na novou základnu.",
+      "comment": ""
+    },
+    {
+      "q": "Jaký port používá standardně PostgreSQL?",
+      "options": [
+        "1433",
+        "1521",
+        "3306",
+        "5432"
+      ],
+      "answer": 3,
+      "explanation": "PostgreSQL používá 5432.",
+      "comment": ""
+    },
+    {
+      "q": "Která vlastnost patří k NoSQL databázím (dokumentové/klíč‑hodnota)?",
+      "options": [
+        "Silná schémata",
+        "Horizontální škálování",
+        "Jen ACID",
+        "Jen relační dotazy"
+      ],
+      "answer": 1,
+      "explanation": "Často snadno horizontálně škálují.",
+      "comment": ""
+    },
+    {
+      "q": "Co je výstupem hash funkce SHA‑256?",
+      "options": [
+        "Klíč proměnné délky",
+        "256bitový digest",
+        "128bitový digest",
+        "Veřejný klíč"
+      ],
+      "answer": 1,
+      "explanation": "SHA‑256 → 256bit hash.",
+      "comment": "Fakta"
+    },
+    {
+      "q": "Který protokol slouží pro časovou synchronizaci?",
+      "options": [
+        "NTP",
+        "BGP",
+        "NAT",
+        "SCTP"
+      ],
+      "answer": 0,
+      "explanation": "Network Time Protocol.",
+      "comment": "Zajímavé"
+    },
+    {
+      "q": "Jakou složitost má Dijkstra s binární haldou na seznamu sousedů?",
+      "options": [
+        "O(V^2)",
+        "O(E log V)",
+        "O(V log E)",
+        "O(E+V)"
+      ],
+      "answer": 1,
+      "explanation": "S prioritní frontou O((V+E) log V) ~ O(E log V).",
+      "comment": ""
+    },
+    {
+      "q": "Jaký příkaz v Linuxu zobrazí otevřené porty poslouchajících procesů?",
+      "options": [
+        "ps",
+        "lsof -i",
+        "grep",
+        "df -h"
+      ],
+      "answer": 1,
+      "explanation": "lsof -i nebo ss/netstat.",
+      "comment": ""
+    },
+    {
+      "q": "Která úroveň izolace nejvíce brání phantom read?",
+      "options": [
+        "Read Committed",
+        "Repeatable Read",
+        "Serializable",
+        "Read Uncommitted"
+      ],
+      "answer": 2,
+      "explanation": "Serializable je nejpřísnější.",
+      "comment": ""
+    },
+    {
+      "q": "Jaký je rozdíl mezi mutexem a semaforem?",
+      "options": [
+        "Žádný",
+        "Mutex je pro vzájemné vyloučení, semafor počítá dostupné zdroje",
+        "Semafor je jen binární",
+        "Mutex může mít hodnotu >1"
+      ],
+      "answer": 1,
+      "explanation": "Semafor může čítat více jednotek.",
+      "comment": ""
+    },
+    {
+      "q": "Které tvrzení o UDP je pravdivé?",
+      "options": [
+        "Zaručené doručení",
+        "Řízení toku",
+        "Bez spojení a bez garance doručení",
+        "Vždy šifruje"
+      ],
+      "answer": 2,
+      "explanation": "UDP je connectionless bez garance.",
+      "comment": ""
+    },
+    {
+      "q": "Kolik adres obsahuje IPv4 prefix /24?",
+      "options": [
+        "254",
+        "255",
+        "256",
+        "512"
+      ],
+      "answer": 2,
+      "explanation": "2^(32−24)=256 adres.",
+      "comment": ""
+    },
+    {
+      "q": "Co umožňuje Kubernetes Ingress?",
+      "options": [
+        "Perzistentní svazky",
+        "Horizontální škálování podů",
+        "Směrování externího HTTP(S) provozu",
+        "Registr tajemství"
+      ],
+      "answer": 2,
+      "explanation": "Ingress publikuje HTTP(S) do clusteru.",
+      "comment": "Bravo"
+    }
+  ]
+}

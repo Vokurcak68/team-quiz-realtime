@@ -637,7 +637,7 @@ const [flash, setFlash] = useState(null);
                 <h2 className="text-xl font-semibold">Otázky</h2>
                 {allSolved ? (
                   <div className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-sm font-medium">
-                    Hotovo! Všechny otázky vyřešeny 🎉
+                    Hotovo! Všechny otázky vyřešeny 🎉 Váš kód je 2289
                   </div>
                 ) : lockRemaining > 0 ? (
                   <div className="px-3 py-1 rounded-full bg-red-100 text-red-700 text-sm font-medium">
@@ -722,7 +722,7 @@ const [flash, setFlash] = useState(null);
                                     { qIndex: selectedIndex, correct: true, authorId: myId, authorNick: nick, comment: cm || null, ts: fs.serverTimestamp() }
                                   );
                                   if (cm) {
-                                    setFlash(`Komentář: ${cm}`);
+                                    setFlash(`Hint: ${cm}`);
                                     setTimeout(() => setFlash(null), 6000);
                                   }
                                 } catch (e) { console.error("Log correct answer failed", e); }
@@ -806,7 +806,7 @@ const [flash, setFlash] = useState(null);
                                   <div className="text-[11px] text-slate-500">{(e.ts?.toDate ? e.ts.toDate() : (e.ts? new Date(e.ts): null))?.toLocaleString?.() || ""}</div>
                                 </div>
                                 {e.correct && e.comment && (
-                                  <div className="mt-1 text-[12px] text-slate-700">Komentář: {e.comment}</div>
+                                  <div className="mt-1 text-[12px] text-slate-700">Hint: {e.comment}</div>
                                 )}
                               </li>
                             ))}

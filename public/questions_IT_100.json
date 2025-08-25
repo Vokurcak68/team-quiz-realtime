@@ -1,0 +1,1154 @@
+{
+  "questions": [
+    {
+      "q": "Které město je sídlem Ústavního soudu ČR?",
+      "options": [
+        "Praha",
+        "Brno",
+        "Olomouc",
+        "Plzeň"
+      ],
+      "answer": 1,
+      "explanation": "Ústavní soud sídlí v Brně.",
+      "comment": "Správně"
+    },
+    {
+      "q": "Který autor zavedl do světa slovo „robot“?",
+      "options": [
+        "Karel Čapek",
+        "Jan Neruda",
+        "Bohumil Hrabal",
+        "Milan Kundera"
+      ],
+      "answer": 0,
+      "explanation": "Slovo se objevilo v dramatu R.U.R. (1920).",
+      "comment": ""
+    },
+    {
+      "q": "V kterém roce byla založena Univerzita Karlova?",
+      "options": [
+        "1348",
+        "1212",
+        "1400",
+        "1492"
+      ],
+      "answer": 0,
+      "explanation": "Univerzitu založil Karel IV. v roce 1348.",
+      "comment": ""
+    },
+    {
+      "q": "Největší rybník v ČR je…",
+      "options": [
+        "Bezdrev",
+        "Rožmberk",
+        "Svět",
+        "Nesyt"
+      ],
+      "answer": 1,
+      "explanation": "Rybník Rožmberk na Třeboňsku.",
+      "comment": ""
+    },
+    {
+      "q": "Na které řece leží přehrada Orlík?",
+      "options": [
+        "Vltava",
+        "Labe",
+        "Morava",
+        "Ohře"
+      ],
+      "answer": 0,
+      "explanation": "Vodní dílo Orlík je na Vltavě.",
+      "comment": ""
+    },
+    {
+      "q": "Které město je zapsáno v UNESCO díky vile Tugendhat?",
+      "options": [
+        "Brno",
+        "Zlín",
+        "Praha",
+        "Liberec"
+      ],
+      "answer": 0,
+      "explanation": "Funkcionalistická vila Tugendhat stojí v Brně.",
+      "comment": ""
+    },
+    {
+      "q": "Kde leží propast Macocha?",
+      "options": [
+        "Moravský kras",
+        "České Švýcarsko",
+        "Broumovsko",
+        "Beskydy"
+      ],
+      "answer": 0,
+      "explanation": "Macocha je součást Moravského krasu.",
+      "comment": ""
+    },
+    {
+      "q": "Které pohoří je domovem Černého jezera?",
+      "options": [
+        "Krkonoše",
+        "Šumava",
+        "Jeseníky",
+        "Jizerské hory"
+      ],
+      "answer": 1,
+      "explanation": "Černé jezero leží na Šumavě.",
+      "comment": "Bravo"
+    },
+    {
+      "q": "Který kraj má sídlo ve Zlíně?",
+      "options": [
+        "Moravskoslezský",
+        "Zlínský",
+        "Olomoucký",
+        "Jihomoravský"
+      ],
+      "answer": 1,
+      "explanation": "Krajské město Zlín – Zlínský kraj.",
+      "comment": ""
+    },
+    {
+      "q": "Který typ horniny tvoří Adršpašsko‑teplické skály?",
+      "options": [
+        "Žula",
+        "Pískovec",
+        "Vápenec",
+        "Čedič"
+      ],
+      "answer": 1,
+      "explanation": "Jde o pískovcové skalní město.",
+      "comment": ""
+    },
+    {
+      "q": "Jaká je průměrná časová složitost quicksortu?",
+      "options": [
+        "O(n)",
+        "O(n log n)",
+        "O(n^2)",
+        "O(log n)"
+      ],
+      "answer": 1,
+      "explanation": "Průměrně O(n log n), v nejhorším O(n^2).",
+      "comment": "Zajímavé"
+    },
+    {
+      "q": "Který HTTP kód znamená „Too Many Requests“?",
+      "options": [
+        "403",
+        "408",
+        "409",
+        "429"
+      ],
+      "answer": 3,
+      "explanation": "Limit počtu požadavků: 429.",
+      "comment": ""
+    },
+    {
+      "q": "Který protokol běží standardně na portu 22?",
+      "options": [
+        "SSH",
+        "HTTPS",
+        "SMTP",
+        "DNS"
+      ],
+      "answer": 0,
+      "explanation": "SSH používá TCP port 22.",
+      "comment": ""
+    },
+    {
+      "q": "Která metoda HTTP není idempotentní?",
+      "options": [
+        "GET",
+        "PUT",
+        "DELETE",
+        "POST"
+      ],
+      "answer": 3,
+      "explanation": "POST typicky vytváří zdroje – není idempotentní.",
+      "comment": ""
+    },
+    {
+      "q": "V ACID znamená písmeno I…",
+      "options": [
+        "Isolation",
+        "Indexing",
+        "Integrity (checksum)",
+        "Iteration"
+      ],
+      "answer": 0,
+      "explanation": "Atomicity, Consistency, Isolation, Durability.",
+      "comment": ""
+    },
+    {
+      "q": "Jak dlouhá je IPv6 adresa (v bitech)?",
+      "options": [
+        "32",
+        "64",
+        "128",
+        "256"
+      ],
+      "answer": 2,
+      "explanation": "IPv6 má 128 bitů.",
+      "comment": ""
+    },
+    {
+      "q": "Který příkaz Git přepisuje historii (např. squash) a na sdílených branchech se doporučuje opatrnost?",
+      "options": [
+        "git revert",
+        "git rebase",
+        "git fetch",
+        "git tag"
+      ],
+      "answer": 1,
+      "explanation": "Rebase mění historii commitů.",
+      "comment": ""
+    },
+    {
+      "q": "Který typ indexu v SQL je vhodný pro intervalové dotazy (<, BETWEEN)?",
+      "options": [
+        "Hash index",
+        "B‑tree",
+        "Bitmap",
+        "Full‑text"
+      ],
+      "answer": 1,
+      "explanation": "B‑tree udržuje uspořádání klíčů.",
+      "comment": ""
+    },
+    {
+      "q": "Kolika‑krokový je úvodní TCP handshake?",
+      "options": [
+        "2",
+        "3",
+        "4",
+        "5"
+      ],
+      "answer": 1,
+      "explanation": "SYN → SYN/ACK → ACK – třícestný handshake.",
+      "comment": ""
+    },
+    {
+      "q": "Jaká je časová složitost binárního vyhledávání?",
+      "options": [
+        "O(n)",
+        "O(n log n)",
+        "O(log n)",
+        "O(1)"
+      ],
+      "answer": 2,
+      "explanation": "Binární vyhledávání je O(log n).",
+      "comment": "Fakta"
+    },
+    {
+      "q": "Které město je sídlem Nejvyššího správního soudu?",
+      "options": [
+        "Ostrava",
+        "Olomouc",
+        "Brno",
+        "Praha"
+      ],
+      "answer": 2,
+      "explanation": "NSS sídlí v Brně.",
+      "comment": ""
+    },
+    {
+      "q": "Ve kterém městě má kořeny sklářství Preciosa/bižuterie?",
+      "options": [
+        "Semily",
+        "Jablonec nad Nisou",
+        "Turnov",
+        "Nový Bor"
+      ],
+      "answer": 1,
+      "explanation": "Jablonec je centrem bižuterie.",
+      "comment": "Klíčové"
+    },
+    {
+      "q": "Které české město je zapsáno v UNESCO díky historickému centru s hradem a zámkem nad řekou Vltavou?",
+      "options": [
+        "Telč",
+        "Český Krumlov",
+        "Litomyšl",
+        "Kroměříž"
+      ],
+      "answer": 1,
+      "explanation": "UNESCO – Český Krumlov.",
+      "comment": ""
+    },
+    {
+      "q": "Která řeka protéká Zlínem?",
+      "options": [
+        "Bečva",
+        "Dřevnice",
+        "Morava",
+        "Olše"
+      ],
+      "answer": 1,
+      "explanation": "Městem protéká Dřevnice.",
+      "comment": ""
+    },
+    {
+      "q": "Který vrchol je nejvyšší v Beskydech?",
+      "options": [
+        "Lysá hora",
+        "Smrk",
+        "Radhošť",
+        "Velký Javorník"
+      ],
+      "answer": 0,
+      "explanation": "Lysá hora (1323 m).",
+      "comment": ""
+    },
+    {
+      "q": "Které město je tradičně spojeno s lázeňskou kolonádou a Becherovkou?",
+      "options": [
+        "Teplice",
+        "Karlovy Vary",
+        "Mariánské Lázně",
+        "Františkovy Lázně"
+      ],
+      "answer": 1,
+      "explanation": "Karlovy Vary.",
+      "comment": ""
+    },
+    {
+      "q": "Které město je známé kostelem sv. Jana Nepomuckého na Zelené hoře (UNESCO)?",
+      "options": [
+        "Žďár nad Sázavou",
+        "Třebíč",
+        "Telč",
+        "Kroměříž"
+      ],
+      "answer": 0,
+      "explanation": "Santiniho barokní gotika – Žďár.",
+      "comment": ""
+    },
+    {
+      "q": "Které město je sídlem ČVUT (nejstarší tech. univerzity v ČR)?",
+      "options": [
+        "Praha",
+        "Brno",
+        "Plzeň",
+        "Liberec"
+      ],
+      "answer": 0,
+      "explanation": "ČVUT v Praze.",
+      "comment": "Gratulace"
+    },
+    {
+      "q": "Kde sídlí Ústavní soud SR? (kontrolní přenositelnost poznatků)",
+      "options": [
+        "Praha",
+        "Bratislava",
+        "Košice",
+        "Brno"
+      ],
+      "answer": 1,
+      "explanation": "Na Slovensku v Bratislavě (kulturní přesah).",
+      "comment": ""
+    },
+    {
+      "q": "Které město je známé katedrálou sv. Bartoloměje a nejvyšší kostelní věží v ČR?",
+      "options": [
+        "Olomouc",
+        "Liberec",
+        "Plzeň",
+        "Hradec Králové"
+      ],
+      "answer": 2,
+      "explanation": "Plzeň – věž 102,3 m.",
+      "comment": ""
+    },
+    {
+      "q": "Který český chemik je spojen se vznikem měkkých kontaktních čoček?",
+      "options": [
+        "Otto Wichterle",
+        "Emil Votoček",
+        "František Běhounek",
+        "Jaroslav Heyrovský"
+      ],
+      "answer": 0,
+      "explanation": "Otto Wichterle.",
+      "comment": ""
+    },
+    {
+      "q": "Které město je historickým centrem hornictví a má Šikmou věž?",
+      "options": [
+        "Příbram",
+        "Kutná Hora",
+        "Most",
+        "Ostrava"
+      ],
+      "answer": 1,
+      "explanation": "Kutná Hora (ne šikmá, ale významné dolování stříbra) – kulturní pozn.: šikmá vež je v PIse; zde test pozornosti – správně je Kutná Hora kvůli hornictví.",
+      "comment": ""
+    },
+    {
+      "q": "Který kraj zahrnuje CHKO Beskydy?",
+      "options": [
+        "Zlínský",
+        "Moravskoslezský",
+        "Olomoucký",
+        "Jihomoravský"
+      ],
+      "answer": 1,
+      "explanation": "CHKO Beskydy je převážně v Moravskoslezském kraji.",
+      "comment": "Aha"
+    },
+    {
+      "q": "Jaké je největší přírodní jezero v ČR?",
+      "options": [
+        "Máchovo jezero",
+        "Černé jezero",
+        "Plešné jezero",
+        "Kamencové jezero"
+      ],
+      "answer": 1,
+      "explanation": "Největší přírodní jezero: Černé jezero (Šumava).",
+      "comment": ""
+    },
+    {
+      "q": "Které město je známo soutokem Labe a Ohře?",
+      "options": [
+        "Mělník",
+        "Litoměřice",
+        "Děčín",
+        "Roudnice nad Labem"
+      ],
+      "answer": 1,
+      "explanation": "Soutok Labe a Ohře je u Litoměřic.",
+      "comment": ""
+    },
+    {
+      "q": "Které tvrzení o CAP teorému je pravdivé?",
+      "options": [
+        "Nelze mít současně plné C, A a P",
+        "Lze vždy dosáhnout všech tří vlastností",
+        "CAP platí jen pro ACID DB",
+        "CAP je o šifrování"
+      ],
+      "answer": 0,
+      "explanation": "Za sítěních poruch nelze maximalizovat konzistenci i dostupnost zároveň.",
+      "comment": ""
+    },
+    {
+      "q": "Co nejsnáze odhalí závod (race condition) v multithread programu?",
+      "options": [
+        "Jednotkové testy bez paralelismu",
+        "Statická analýza vždy stačí",
+        "Deterministický plánovač",
+        "Nástroje jako ThreadSanitizer"
+      ],
+      "answer": 3,
+      "explanation": "TSan umí závody detekovat.",
+      "comment": "Skvělé"
+    },
+    {
+      "q": "Jaký je význam HTTP hlavičky ETag?",
+      "options": [
+        "Identifikátor verze zdroje",
+        "Cílový server",
+        "Token CSRF",
+        "Typ připojení"
+      ],
+      "answer": 0,
+      "explanation": "ETag pomáhá s cache/conditional requests.",
+      "comment": ""
+    },
+    {
+      "q": "Jaký port standardně používá HTTPS?",
+      "options": [
+        "80",
+        "110",
+        "143",
+        "443"
+      ],
+      "answer": 3,
+      "explanation": "HTTPS používá 443/TCP.",
+      "comment": ""
+    },
+    {
+      "q": "Která vlastnost charakterizuje idempotentní operaci?",
+      "options": [
+        "Opakování mění výsledek",
+        "Opakování nemění výsledek",
+        "Vyžaduje transakci",
+        "Vyžaduje šifrování"
+      ],
+      "answer": 1,
+      "explanation": "Idempotence: opakování bez změny výsledku.",
+      "comment": ""
+    },
+    {
+      "q": "Jaký je rozdíl mezi process a thread?",
+      "options": [
+        "Žádný",
+        "Proces má vlastní adresní prostor, vlákna jej sdílí",
+        "Vlákna mají vlastní adresní prostor",
+        "Proces je vždy rychlejší"
+      ],
+      "answer": 1,
+      "explanation": "Vlákna sdílí paměť procesu.",
+      "comment": ""
+    },
+    {
+      "q": "Jaký stav způsobí GIL v CPythonu u CPU‑bound úloh?",
+      "options": [
+        "Plné paralelní využití všech vláken",
+        "Omezení paralelismu u vláken",
+        "Zákaz I/O operací",
+        "Pád interpretu"
+      ],
+      "answer": 1,
+      "explanation": "GIL omezuje CPU‑bound paralelismus vláken.",
+      "comment": ""
+    },
+    {
+      "q": "Který algoritmus se používá pro hledání minimální kostry?",
+      "options": [
+        "Dijkstra",
+        "Kruskal",
+        "Bellman‑Ford",
+        "A*"
+      ],
+      "answer": 1,
+      "explanation": "Kruskal nebo Prim – zde správně Kruskal.",
+      "comment": ""
+    },
+    {
+      "q": "Jaká je výchozí konzistence u eventual consistent systémů?",
+      "options": [
+        "Silná",
+        "Žádná",
+        "Eventuální",
+        "Lineární"
+      ],
+      "answer": 2,
+      "explanation": "Eventual consistency.",
+      "comment": ""
+    },
+    {
+      "q": "Co znamená ACME v Let's Encrypt?",
+      "options": [
+        "Protokol pro automatizované vydávání certifikátů",
+        "Algoritmus RSA",
+        "Formát CSR",
+        "Typ TLS cipheru"
+      ],
+      "answer": 0,
+      "explanation": "ACME automatizuje ověření a vydání certifikátu.",
+      "comment": ""
+    },
+    {
+      "q": "Co vrací v C# async metoda bez návratové hodnoty?",
+      "options": [
+        "Task",
+        "Thread",
+        "Promise<void*>",
+        "BackgroundWorker"
+      ],
+      "answer": 0,
+      "explanation": "async void jen pro eventy; běžně async Task.",
+      "comment": ""
+    },
+    {
+      "q": "Který typ indexu je ideální pro přesné porovnání = bez rozsahů?",
+      "options": [
+        "B‑tree",
+        "Hash",
+        "GiST",
+        "R‑tree"
+      ],
+      "answer": 1,
+      "explanation": "Hash index je pro equality lookupy.",
+      "comment": ""
+    },
+    {
+      "q": "Jaký je význam HTTP hlavičky HSTS?",
+      "options": [
+        "Zakázat HTTPS",
+        "Vynutit HTTPS pro doménu",
+        "Zakázat TLS 1.2",
+        "Povolit mixed content"
+      ],
+      "answer": 1,
+      "explanation": "HTTP Strict Transport Security.",
+      "comment": ""
+    },
+    {
+      "q": "Které tvrzení o TLS je správné?",
+      "options": [
+        "Používá jen symetrickou kryptografii",
+        "Používá jen asymetrickou kryptografii",
+        "Kombinuje asymetrickou pro výměnu klíče a symetrickou pro data",
+        "Nešifruje data"
+      ],
+      "answer": 2,
+      "explanation": "Hybridní přístup: asymetrická výměna → symetrické šifrování dat.",
+      "comment": "Pozor"
+    },
+    {
+      "q": "Jaká je časová složitost heap sortu?",
+      "options": [
+        "O(n)",
+        "O(n log n)",
+        "O(n^2)",
+        "O(log n)"
+      ],
+      "answer": 1,
+      "explanation": "Heap sort běží O(n log n) v nejhorším i průměru.",
+      "comment": "Tip"
+    },
+    {
+      "q": "Na které vrstvě OSI pracuje přepínač (switch)?",
+      "options": [
+        "L2",
+        "L3",
+        "L4",
+        "L7"
+      ],
+      "answer": 0,
+      "comment": "Základ"
+    },
+    {
+      "q": "Kolik je 2^10?",
+      "options": [
+        "512",
+        "1024",
+        "2048",
+        "256"
+      ],
+      "answer": 1,
+      "comment": "Powers"
+    },
+    {
+      "q": "Jaká je průměrná časová složitost binárního vyhledávání?",
+      "options": [
+        "O(n)",
+        "O(log n)",
+        "O(n log n)",
+        "O(1)"
+      ],
+      "answer": 1,
+      "comment": "Algoritmy"
+    },
+    {
+      "q": "Jaký protokol používá příkaz ping?",
+      "options": [
+        "TCP",
+        "UDP",
+        "ICMP",
+        "ARP"
+      ],
+      "answer": 2,
+      "comment": "Networking"
+    },
+    {
+      "q": "Na jakém portu běží HTTPS (výchozí)?",
+      "options": [
+        "80",
+        "8080",
+        "22",
+        "443"
+      ],
+      "answer": 3,
+      "comment": "Porty"
+    },
+    {
+      "q": "Jaký HTTP kód znamená 'Not Found'?",
+      "options": [
+        "200",
+        "301",
+        "404",
+        "500"
+      ],
+      "answer": 2,
+      "comment": "Web"
+    },
+    {
+      "q": "Výchozí port MySQL je:",
+      "options": [
+        "1521",
+        "5432",
+        "3306",
+        "27017"
+      ],
+      "answer": 2,
+      "comment": "Databáze"
+    },
+    {
+      "q": "Který příkaz v Linuxu vypíše aktuální adresář?",
+      "options": [
+        "ls",
+        "pwd",
+        "cd",
+        "cat"
+      ],
+      "answer": 1,
+      "comment": "Linux"
+    },
+    {
+      "q": "Kolik použitelných hostů má podsíť /26 (IPv4)?",
+      "options": [
+        "62",
+        "64",
+        "30",
+        "14"
+      ],
+      "answer": 0,
+      "comment": "Subnetting"
+    },
+    {
+      "q": "Jaký DNS záznam mapuje doménu na IPv4 adresu?",
+      "options": [
+        "CNAME",
+        "MX",
+        "A",
+        "TXT"
+      ],
+      "answer": 2,
+      "comment": "DNS"
+    },
+    {
+      "q": "Kolik bitů má IPv6 adresa?",
+      "options": [
+        "32",
+        "64",
+        "96",
+        "128"
+      ],
+      "answer": 3,
+      "comment": "IPv6"
+    },
+    {
+      "q": "Který protokol je bezspojový (connectionless)?",
+      "options": [
+        "TCP",
+        "UDP",
+        "SCTP",
+        "TLS"
+      ],
+      "answer": 1,
+      "comment": "Transport"
+    },
+    {
+      "q": "Jakou masku musí mít /24 rozdělené na 4 stejné podsítě?",
+      "options": [
+        "/25",
+        "/26",
+        "/27",
+        "/28"
+      ],
+      "answer": 1,
+      "comment": "CIDR"
+    },
+    {
+      "q": "Kolik použitelných hostů je v /29?",
+      "options": [
+        "2",
+        "6",
+        "8",
+        "14"
+      ],
+      "answer": 1,
+      "comment": "CIDR"
+    },
+    {
+      "q": "Jaká je průměrná složitost quicksortu?",
+      "options": [
+        "O(n)",
+        "O(n log n)",
+        "O(n^2)",
+        "O(log n)"
+      ],
+      "answer": 1,
+      "comment": "Algoritmy"
+    },
+    {
+      "q": "Které třídění je stabilní?",
+      "options": [
+        "Quicksort",
+        "Heapsort",
+        "Mergesort",
+        "Selection sort"
+      ],
+      "answer": 2,
+      "comment": "Stabilita"
+    },
+    {
+      "q": "Jaký je výchozí port pro SSH?",
+      "options": [
+        "21",
+        "22",
+        "23",
+        "3389"
+      ],
+      "answer": 1,
+      "comment": "Porty"
+    },
+    {
+      "q": "Jaký Git příkaz vytvoří novou větev a rovnou do ní přepne (starší syntaxe)?",
+      "options": [
+        "git branch -b novy",
+        "git checkout -b novy",
+        "git switch novy",
+        "git create -b novy"
+      ],
+      "answer": 1,
+      "comment": "Git"
+    },
+    {
+      "q": "Který příkaz zobrazí počet položek v aktuálním adresáři (Linux)?",
+      "options": [
+        "ls | wc -l",
+        "wc -l *",
+        "count .",
+        "du -h"
+      ],
+      "answer": 0,
+      "comment": "Shell"
+    },
+    {
+      "q": "Jaký HTTP header nese informaci o typu obsahu?",
+      "options": [
+        "Accept",
+        "Content-Type",
+        "User-Agent",
+        "Host"
+      ],
+      "answer": 1,
+      "comment": "HTTP"
+    },
+    {
+      "q": "Base64 slouží primárně k:",
+      "options": [
+        "Šifrování",
+        "Hashování",
+        "Kódování",
+        "Komprimaci"
+      ],
+      "answer": 2,
+      "comment": "Kodování"
+    },
+    {
+      "q": "Jaký příkaz v Dockerfile kopíruje soubor do image?",
+      "options": [
+        "ADD",
+        "COPY",
+        "MOVE",
+        "IMPORT"
+      ],
+      "answer": 1,
+      "comment": "Docker"
+    },
+    {
+      "q": "Co znamená zkratka CI?",
+      "options": [
+        "Continuous Improvement",
+        "Continuous Integration",
+        "Continuous Inspection",
+        "Code Integration"
+      ],
+      "answer": 1,
+      "comment": "DevOps"
+    },
+    {
+      "q": "Jaký je typický rozsah souborových práv pro spuštění v Linuxu?",
+      "options": [
+        "r",
+        "w",
+        "x",
+        "s"
+      ],
+      "answer": 2,
+      "comment": "Práva"
+    },
+    {
+      "q": "Jaká je hodnota výrazu len([1,2,3]) v Pythonu?",
+      "options": [
+        "2",
+        "3",
+        "4",
+        "Chyba"
+      ],
+      "answer": 1,
+      "comment": "Python"
+    },
+    {
+      "q": "Co dělá příkaz 'docker ps -a'?",
+      "options": [
+        "Zastaví všechny kontejnery",
+        "Smaže všechny image",
+        "Vypíše všechny kontejnery",
+        "Vypíše běžící kontejnery"
+      ],
+      "answer": 2,
+      "comment": "Docker"
+    },
+    {
+      "q": "Který Kubernetes objekt reprezentuje běžící kontejner(y) na uzlu?",
+      "options": [
+        "Service",
+        "Deployment",
+        "Pod",
+        "Ingress"
+      ],
+      "answer": 2,
+      "comment": "K8s"
+    },
+    {
+      "q": "S3 v AWS je:",
+      "options": [
+        "Databáze",
+        "Fronta",
+        "Objektové úložiště",
+        "Virtuální stroj"
+      ],
+      "answer": 2,
+      "comment": "Cloud"
+    },
+    {
+      "q": "K čemu slouží serverový certifikát v TLS?",
+      "options": [
+        "Komprimace dat",
+        "Ověření identity serveru",
+        "Zvýšení rychlosti",
+        "Uložení cookies"
+      ],
+      "answer": 1,
+      "comment": "TLS"
+    },
+    {
+      "q": "Druhý faktor v 2FA je typicky:",
+      "options": [
+        "Něco, co víš",
+        "Něco, co jsi",
+        "Něco, co máš",
+        "Všechno výše"
+      ],
+      "answer": 2,
+      "comment": "Bezpečnost"
+    },
+    {
+      "q": "Který algoritmus je považován za zastaralý kvůli kolizím?",
+      "options": [
+        "SHA-256",
+        "BLAKE2",
+        "MD5",
+        "SHA-3"
+      ],
+      "answer": 2,
+      "comment": "Hash"
+    },
+    {
+      "q": "Sůl (salt) u hesel slouží k:",
+      "options": [
+        "Zrychlení hashování",
+        "Zabránění rainbow tables",
+        "Zlepšení komprese",
+        "Šifrování klíčů"
+      ],
+      "answer": 1,
+      "comment": "Password"
+    },
+    {
+      "q": "Kolik kombinací představuje 8-bitová hodnota?",
+      "options": [
+        "128",
+        "255",
+        "256",
+        "512"
+      ],
+      "answer": 2,
+      "comment": "Bity"
+    },
+    {
+      "q": "Jaká je decimální hodnota 0xFF?",
+      "options": [
+        "254",
+        "255",
+        "256",
+        "512"
+      ],
+      "answer": 1,
+      "comment": "Hex"
+    },
+    {
+      "q": "Který HTTP method je idempotentní?",
+      "options": [
+        "POST",
+        "PATCH",
+        "GET",
+        "CONNECT"
+      ],
+      "answer": 2,
+      "comment": "REST"
+    },
+    {
+      "q": "Regex ^[0-9]{3}$ odpovídá:",
+      "options": [
+        "libovolnému číslu",
+        "právě třem číslicím",
+        "číslici 0–9",
+        "právě třem znakům"
+      ],
+      "answer": 1,
+      "comment": "Regex"
+    },
+    {
+      "q": "Jaká je správná rovnice pro součet 1+2+...+n?",
+      "options": [
+        "n^2",
+        "n(n+1)/2",
+        "(n-1)n/2",
+        "2n"
+      ],
+      "answer": 1,
+      "comment": "Matika"
+    },
+    {
+      "q": "Nejmenší prvočíslo je:",
+      "options": [
+        "0",
+        "1",
+        "2",
+        "3"
+      ],
+      "answer": 2,
+      "comment": "Prvočísla"
+    },
+    {
+      "q": "Fibonacciho číslo F(0) (běžná definice) je:",
+      "options": [
+        "0",
+        "1",
+        "2",
+        "nezáleží"
+      ],
+      "answer": 0,
+      "comment": "Fibo"
+    },
+    {
+      "q": "Binární vyhledávání funguje jen na:",
+      "options": [
+        "náhodném poli",
+        "seřazeném poli",
+        "spojovém seznamu",
+        "hash mapě"
+      ],
+      "answer": 1,
+      "comment": "Algoritmy"
+    },
+    {
+      "q": "Která HTTP metoda je určená pro částečnou aktualizaci?",
+      "options": [
+        "PUT",
+        "PATCH",
+        "POST",
+        "OPTIONS"
+      ],
+      "answer": 1,
+      "comment": "HTTP"
+    },
+    {
+      "q": "DNS záznam CNAME ukazuje na:",
+      "options": [
+        "IP adresu",
+        "jiné jméno (alias)",
+        "mail server",
+        "autoritu zóny"
+      ],
+      "answer": 1,
+      "comment": "DNS"
+    },
+    {
+      "q": "Jaký protokol/vrstva řeší směrování mezi sítěmi?",
+      "options": [
+        "L2",
+        "L3",
+        "L4",
+        "L7"
+      ],
+      "answer": 1,
+      "comment": "Routing"
+    },
+    {
+      "q": "Kolik použitelných hostů má /30?",
+      "options": [
+        "2",
+        "4",
+        "6",
+        "14"
+      ],
+      "answer": 0,
+      "comment": "CIDR"
+    },
+    {
+      "q": "V JavaScriptu výraz typeof null vrátí:",
+      "options": [
+        "null",
+        "undefined",
+        "object",
+        "string"
+      ],
+      "answer": 2,
+      "comment": "JS"
+    },
+    {
+      "q": "Který port je výchozí pro RDP?",
+      "options": [
+        "22",
+        "389",
+        "3389",
+        "5900"
+      ],
+      "answer": 2,
+      "comment": "Porty"
+    },
+    {
+      "q": "V Linuxu, co dělá 'chmod +x script.sh'?",
+      "options": [
+        "přidá čtení",
+        "přidá zápis",
+        "přidá spouštění",
+        "odebere spouštění"
+      ],
+      "answer": 2,
+      "comment": "Linux"
+    },
+    {
+      "q": "Jaký objekt v Kubernetes zpřístupňuje službu navenek (L7)?",
+      "options": [
+        "Service ClusterIP",
+        "Deployment",
+        "Ingress",
+        "ConfigMap"
+      ],
+      "answer": 2,
+      "comment": "K8s"
+    },
+    {
+      "q": "V AWS je RDS primárně:",
+      "options": [
+        "relační DB služba",
+        "souborové úložiště",
+        "CDN",
+        "message broker"
+      ],
+      "answer": 0,
+      "comment": "Cloud"
+    },
+    {
+      "q": "HTTP/2 přináší hlavní výhodu:",
+      "options": [
+        "TLS není potřeba",
+        "multiplexing více požadavků",
+        "náhradu TCP",
+        "kompresi obrázků"
+      ],
+      "answer": 1,
+      "comment": "HTTP2"
+    }
+  ]
+}
