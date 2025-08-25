@@ -1,11 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+
 // =============================================
-// Síťový týmový kvíz (2–5 hráčů) – React + Firestore
+// Síťový týmový kvíz (2–5 hráčů) – React + Firestore (CDN)
 // =============================================
-// Canvas-friendly verze: Firebase se natahuje z CDN, BEZ npm install.
-// Vestavěné UI: "Nastavení Firebase" + "Import JSON" se sadou otázek.
-// Nový týmový režim: kvíz končí, když jsou VŠECHNY otázky správně
-// zodpovězeny libovolným hráčem (globální seznam vyřešených).
+// • Import otázek z JSONu (kompat.: { q, options[], answer, comment? })
+// • Týmový režim: kvíz končí, když jsou VŠECHNY otázky vyřešeny LIBOVOLNÝM hráčem
+// • Špatná odpověď = 10s globální zámek (pauza) s informací, kdo ji způsobil
+// • Chat a log odpovědí (po dokončení kvízu)
+// • POP‑UP okno pro každou otázku (volitelné). Klik na číslo → nové okno.
+//   – Toggle „Otevírat v novém okně“ (výchozí zapnuto)
+//   – Popup odešle odpověď do hlavního okna; hlavní okno vše zapíše do Firestore
+//   – Po vyhodnocení se popup s hláškou zavře do ~1.5 s
 // =============================================
 
 // --- Výchozí (placeholder) config – šablona pro UI ---
@@ -28,7 +33,6 @@ const STATIC_FIREBASE_CONFIG = {
   storageBucket: "kviz-a3c45.appspot.com",
   messagingSenderId: "42428150893",
   appId: "1:42428150893:web:7af0d07dd45eaff935fb64",
-  // measurementId je volitelný
 };
 
 // --- Firebase přes CDN (bez npm) ---
@@ -47,9 +51,7 @@ async function getFS(activeConfig) {
   );
   const app = initializeApp(activeConfig);
   const db = fs.getFirestore(app);
-  _fs = fs;
-  _db = db;
-  _initialized = true;
+  _fs = fs; _db = db; _initialized = true;
   return { fs, db };
 }
 
@@ -67,35 +69,18 @@ function normalizeRoom(code) {
   return (code || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12) || "QUIZ";
 }
 
-function classNames(...xs) {
-  return xs.filter(Boolean).join(" ");
-}
+function classNames(...xs) { return xs.filter(Boolean).join(" "); }
 
 function loadSavedConfig() {
-  try {
-    const raw = localStorage.getItem(LS_FB);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
+  try { const raw = localStorage.getItem(LS_FB); return raw ? JSON.parse(raw) : {}; } catch { return {}; }
 }
 
 function loadSavedQuestions() {
-  try {
-    const raw = localStorage.getItem(LS_QS);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  try { const raw = localStorage.getItem(LS_QS); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
 
-function saveQuestionsToLS(qs) {
-  try { localStorage.setItem(LS_QS, JSON.stringify(qs)); } catch {}
-}
-
-function clearSavedQuestions() {
-  try { localStorage.removeItem(LS_QS); } catch {}
-}
+function saveQuestionsToLS(qs) { try { localStorage.setItem(LS_QS, JSON.stringify(qs)); } catch {} }
+function clearSavedQuestions() { try { localStorage.removeItem(LS_QS); } catch {} }
 
 function isConfigReady(cfg) {
   if (!cfg) return false;
@@ -112,7 +97,6 @@ function validateQuestions(payload) {
     const options = Array.isArray(item.options) ? item.options.filter((o) => typeof o === "string") : [];
     const answer = Number.isInteger(item.answer) ? item.answer : -1;
     if (options.length < 2 || answer < 0 || answer >= options.length) continue;
-    // nový volitelný atribut: comment (zpětně kompatibilní s dřívějším explanation)
     const comment = typeof item.comment === 'string' ? item.comment : (typeof item.explanation === 'string' ? item.explanation : "");
     clean.push({ q: item.q, options, answer, comment });
   }
@@ -125,11 +109,6 @@ const FALLBACK_QUESTIONS = [
   { q: "Která řeka protéká Prahou?", options: ["Labe", "Morava", "Vltava", "Odra"], answer: 2 },
   { q: "Nejvyšší hora ČR je…", options: ["Lysá hora", "Sněžka", "Radhošť", "Praděd"], answer: 1 },
   { q: "Kolik krajů má ČR (vč. Prahy)?", options: ["10", "13", "14", "15"], answer: 2 },
-  { q: "Pilsner Urquell pochází z…", options: ["České Budějovice", "Plzeň", "Žatec", "Jihlava"], answer: 1 },
-  { q: "Nejdelší česká řeka je…", options: ["Labe", "Morava", "Dyje", "Vltava"], answer: 3 },
-  { q: "Který hrad je největší komplex?", options: ["Karlštejn", "Pražský hrad", "Křivoklát", "Hluboká"], answer: 1 },
-  { q: "Lázeňství + filmový festival", options: ["Luhačovice", "Karlovy Vary", "Teplice", "Mariánské Lázně"], answer: 1 },
-  { q: "Genetika (hrách)", options: ["Purkyně", "Heyrovský", "Mendel", "Wichterle"], answer: 2 },
 ];
 
 async function loadQuestionBankFromFile(file) {
@@ -196,31 +175,30 @@ export default function TeamQuizRealtime() {
   const [localQuestions, setLocalQuestions] = useState(null); // lokální sada (fallback nebo import)
   const [loading, setLoading] = useState(false);
 
-  // Lokální volba otázky + UI
+  // UI / volby
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [lockRemaining, setLockRemaining] = useState(0);
   const [showCfg, setShowCfg] = useState(false);
   const [fileInfo, setFileInfo] = useState("");
-const [showOnlyUnsolved, setShowOnlyUnsolved] = useState(false);
-const [jumpTo, setJumpTo] = useState("");
-const [chatMessages, setChatMessages] = useState([]);
-const [chatInput, setChatInput] = useState("");
-const chatBoxRef = useRef(null);
-const unsubChatRef = useRef(null);
-const unsubAnswersRef = useRef(null);
-const [answersLog, setAnswersLog] = useState([]);
-const [showLog, setShowLog] = useState(false);
-const [flash, setFlash] = useState(null);
+  const [showOnlyUnsolved, setShowOnlyUnsolved] = useState(false);
+  const [openInWindow, setOpenInWindow] = useState(true);
+  const [jumpTo, setJumpTo] = useState("");
+  const [flash, setFlash] = useState(null);
 
-  // Podmínky pro aktivaci Start
-  const canStart = useMemo(() => {
-    const count = players.length;
-    return configReady && !room?.started && count >= 2 && count <= 5;
-  }, [configReady, room?.started, players.length]);
+  // Chat / log
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState("");
+  const [answersLog, setAnswersLog] = useState([]);
+  const [showLog, setShowLog] = useState(false);
 
+  // Refs
+  const chatBoxRef = useRef(null);
+  const unsubChatRef = useRef(null);
+  const unsubAnswersRef = useRef(null);
   const unsubRoomRef = useRef(null);
   const unsubPlayersRef = useRef(null);
   const lockTimerRef = useRef(null);
+  const effectiveQuestionsRef = useRef([]); // pro listener z popupu (vyhne se TDZ)
 
   // Načti lokální sadu (fallback nebo uložený import)
   useEffect(() => {
@@ -241,10 +219,7 @@ const [flash, setFlash] = useState(null);
 
   // Sleduj globální zámek a počítej odpočet
   useEffect(() => {
-    if (!room?.lockedAt) {
-      setLockRemaining(0);
-      return;
-    }
+    if (!room?.lockedAt) { setLockRemaining(0); return; }
     const tick = () => {
       const startMs = room.lockedAt?.toMillis ? room.lockedAt.toMillis() : room.lockedAt;
       const rem = Math.max(0, Math.ceil((startMs + PENALTY_MS - Date.now()) / 1000));
@@ -257,73 +232,136 @@ const [flash, setFlash] = useState(null);
   }, [room?.lockedAt]);
 
   // Jakmile kdokoliv ve stejné místnosti spustí hru, automaticky přepni všechny do GAME
-  useEffect(() => {
-    if (room?.started && stage !== "game") {
-      setStage("game");
-    }
-  }, [room?.started, stage]);
+  useEffect(() => { if (room?.started && stage !== "game") setStage("game"); }, [room?.started, stage]);
 
-  // Auto-scroll chatu na poslední zprávu
+  // Odvozené otázky (definuj PŘED listenerem)
+  const effectiveQuestions = useMemo(() => {
+    const shared = room?.bank?.items;
+    if (Array.isArray(shared) && shared.length) return shared;
+    return localQuestions || [];
+  }, [room?.bank?.items, localQuestions]);
+
+  // drž vždy aktuální sadu pro handler v popupu
+  useEffect(() => { effectiveQuestionsRef.current = effectiveQuestions; }, [effectiveQuestions]);
+
+  const solvedMap = room?.solved || {};
+  const solvedCount = Object.keys(solvedMap).length;
+  const totalCount = effectiveQuestions.length || 0;
+  const allSolved = totalCount > 0 && solvedCount >= totalCount;
+
+  // Listener pro pop‑up okna – přijímá odpovědi a vrací výsledek
   useEffect(() => {
-    if (chatBoxRef.current) {
-      chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
+    function onMsg(ev) {
+      const d = ev?.data || {};
+      if (!d || typeof d !== 'object') return;
+      if (d.type === 'popup-answer' && Number.isInteger(d.qIndex) && Number.isInteger(d.choice)) {
+        submitAnswerFromPopup(d.qIndex, d.choice, ev.source);
+      }
     }
-  }, [chatMessages.length, stage]);
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, [room?.id, myId, nick]); // neodkazuj na effectiveQuestions – čteme z refu
+
+  async function submitAnswerFromPopup(qIndex, choice, popwin) {
+    try {
+      if (!effectiveQuestionsRef.current?.[qIndex] || !room?.id) return;
+      const { fs, db } = await getFS(activeConfig);
+      const rRef = fs.doc(db, "rooms", normalizeRoom(roomCode));
+      const ok = choice === (effectiveQuestionsRef.current[qIndex]?.answer);
+      if (ok) {
+        try {
+          await fs.updateDoc(fs.doc(db, "rooms", normalizeRoom(roomCode), "players", myId), { score: fs.increment(1) });
+          const patch = {}; patch[`solved.${qIndex}`] = true; await fs.updateDoc(rRef, patch);
+          const cm = (effectiveQuestionsRef.current[qIndex]?.comment || "").trim();
+          await fs.addDoc(fs.collection(db, "rooms", normalizeRoom(roomCode), "answers"),
+            { qIndex, correct: true, authorId: myId, authorNick: nick, comment: cm || null, ts: fs.serverTimestamp() });
+          if (popwin && popwin.postMessage) popwin.postMessage({ type: 'popup-result', qIndex, correct: true, comment: (cm || null) }, '*');
+          if (cm) { setFlash(`Hint: ${cm}`); setTimeout(() => setFlash(null), 6000); }
+        } catch (e) { console.error(e); }
+      } else {
+        try {
+          await fs.runTransaction(db, async (tx) => {
+            const snap = await tx.get(rRef);
+            const now = Date.now();
+            const lockedAt = snap.data()?.lockedAt;
+            const stillLocked = lockedAt && (lockedAt.toMillis ? (lockedAt.toMillis() + PENALTY_MS > now) : (lockedAt + PENALTY_MS > now));
+            if (!stillLocked) tx.update(rRef, { lockedAt: (await getFS(activeConfig)).fs.serverTimestamp(), lockedBy: nick });
+          });
+        } catch (e) { console.error("Lock TX failed", e); }
+        try {
+          await fs.addDoc(fs.collection(db, "rooms", normalizeRoom(roomCode), "answers"),
+            { qIndex, correct: false, authorId: myId, authorNick: nick, choice: choice, ts: fs.serverTimestamp() });
+        } catch (e) { console.error("Log wrong answer failed", e); }
+        if (popwin && popwin.postMessage) popwin.postMessage({ type: 'popup-result', qIndex, correct: false }, '*');
+      }
+    } catch (e) { console.error(e); }
+  }
+
+  async function submitAnswerInline(qIndex, choice) {
+    return submitAnswerFromPopup(qIndex, choice, null);
+  }
+
+  function openQuestionPopup(idx) {
+    try {
+      if (!effectiveQuestionsRef.current?.[idx]) return;
+      const q = effectiveQuestionsRef.current[idx];
+      const w = window.open('', `q${idx}-${Date.now()}`, 'width=520,height=720,menubar=no,toolbar=no,location=no,status=no');
+      if (!w) { alert('Prohlížeč zablokoval okno. Povolte vyskakovací okna pro tuto stránku.'); return; }
+      const esc = (s) => String(s || '').replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]));
+      const html = `<!doctype html><html><head><meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Otázka #${idx+1}</title>
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;margin:0;padding:16px;background:#f8fafc;color:#0f172a}
+  .hdr{font-weight:700;margin-bottom:8px}
+  .q{font-size:16px;margin:8px 0 12px}
+  .opt{display:block;width:100%;text-align:left;margin:8px 0;padding:10px 12px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;cursor:pointer}
+  .info{margin-top:12px;font-size:14px}
+</style></head><body>
+  <div class="hdr">Otázka #${idx+1}</div>
+  <div class="q">${esc(q.q)}</div>
+  <div id="opts"></div>
+  <div id="info" class="info"></div>
+<script>
+  const qIndex=${idx};
+  const options=${JSON.stringify(q.options)};
+  function send(choice){ try{ window.opener && window.opener.postMessage({type:'popup-answer', qIndex, choice}, '*'); }catch(e){} }
+  const box=document.getElementById('opts');
+  options.forEach((t,i)=>{ const b=document.createElement('button'); b.className='opt'; b.textContent=t; b.onclick=()=>{ send(i); Array.from(box.children).forEach(x=>x.disabled=true); }; box.appendChild(b); });
+  window.addEventListener('message', (ev)=>{ const d=ev.data||{}; if(d.type==='popup-result' && d.qIndex===qIndex){ const el=document.getElementById('info'); if(d.correct){ el.textContent = d.comment? ('Správně! Hint:'+d.comment) : 'Správně!'; setTimeout(()=>{ window.close(); }, 1200); } else { el.textContent = 'Špatně. Pauza 10 s…'; setTimeout(()=>{ el.textContent='Zkuste znovu.'; Array.from(box.children).forEach(x=>x.disabled=false); }, 10000); } }});
+</script>
+</body></html>`;
+      w.document.open(); w.document.write(html); w.document.close();
+    } catch (e) { alert('Nepodařilo se otevřít okno: ' + e.message); }
+  }
+
+  // Auto‑scroll chatu na poslední zprávu
+  useEffect(() => { if (chatBoxRef.current) chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight; }, [chatMessages.length, stage]);
 
   function saveFirebaseCfg(next) {
     const merged = { ...firebaseCfg, ...next };
     setFirebaseCfg(merged);
     try { localStorage.setItem(LS_FB, JSON.stringify(merged)); } catch {}
   }
-
-  function resetFirebaseCfg() {
-    setFirebaseCfg({ ...firebaseConfigDefaults });
-    try { localStorage.removeItem(LS_FB); } catch {}
-  }
+  function resetFirebaseCfg() { setFirebaseCfg({ ...firebaseConfigDefaults }); try { localStorage.removeItem(LS_FB); } catch {} }
 
   // Připojení do místnosti
   async function joinRoom() {
-    if (!configReady) {
-      alert("Doplňte prosím Firebase konfiguraci v sekci Nastavení.");
-      setShowCfg(true);
-      return;
-    }
-
+    if (!configReady) { alert("Doplňte prosím Firebase konfiguraci v sekci Nastavení."); setShowCfg(true); return; }
     const { fs, db } = await getFS(activeConfig);
-
     const code = normalizeRoom(roomCode);
     const nickname = nick.trim().slice(0, 24) || "Player";
-    setRoomCode(code);
-    setNick(nickname);
-    localStorage.setItem("tqr:room", code);
-    localStorage.setItem("tqr:nick", nickname);
-
+    setRoomCode(code); setNick(nickname);
+    localStorage.setItem("tqr:room", code); localStorage.setItem("tqr:nick", nickname);
     setLoading(true);
     try {
       const roomRef = fs.doc(db, "rooms", code);
       const snap = await fs.getDoc(roomRef);
       if (!snap.exists()) {
-        await fs.setDoc(roomRef, {
-          createdAt: fs.serverTimestamp(),
-          started: false,
-          lockedAt: null,
-          lockedBy: "",
-          bank: null, // ot. sada bude publikována při Startu
-          solved: {}, // mapa vyřešených otázek
-        });
+        await fs.setDoc(roomRef, { createdAt: fs.serverTimestamp(), started: false, lockedAt: null, lockedBy: "", bank: null, solved: {} });
       }
-      // Zapiš/aktualizuj hráče
       const playerRef = fs.doc(db, "rooms", code, "players", myId);
-      await fs.setDoc(
-        playerRef,
-        {
-          nickname,
-          score: 0,
-          joinedAt: fs.serverTimestamp(),
-          lastSeen: fs.serverTimestamp(),
-        },
-        { merge: true }
-      );
+      await fs.setDoc(playerRef, { nickname, score: 0, joinedAt: fs.serverTimestamp(), lastSeen: fs.serverTimestamp() }, { merge: true });
 
       // Subscriptions
       unsubRoomRef.current && unsubRoomRef.current();
@@ -331,72 +369,40 @@ const [flash, setFlash] = useState(null);
       unsubRoomRef.current = fs.onSnapshot(roomRef, (d) => setRoom({ id: d.id, ...d.data() }));
       unsubPlayersRef.current = fs.onSnapshot(
         fs.query(fs.collection(db, "rooms", code, "players"), fs.orderBy("joinedAt", "asc")),
-        (qs) => {
-          const arr = [];
-          qs.forEach((x) => arr.push({ id: x.id, ...x.data() }));
-          setPlayers(arr);
-        }
+        (qs) => { const arr = []; qs.forEach((x) => arr.push({ id: x.id, ...x.data() })); setPlayers(arr); }
       );
 
       // Chat subscription
       unsubChatRef.current && unsubChatRef.current();
       unsubChatRef.current = fs.onSnapshot(
-        fs.query(
-          fs.collection(db, "rooms", code, "chat"),
-          fs.orderBy("ts", "asc"),
-          fs.limit(200)
-        ),
-        (qs) => {
-          const arr = [];
-          qs.forEach((x) => arr.push({ id: x.id, ...x.data() }));
-          setChatMessages(arr);
-        }
+        fs.query(fs.collection(db, "rooms", code, "chat"), fs.orderBy("ts", "asc"), fs.limit(200)),
+        (qs) => { const arr = []; qs.forEach((x) => arr.push({ id: x.id, ...x.data() })); setChatMessages(arr); }
       );
 
       // Answers log subscription
       unsubAnswersRef.current && unsubAnswersRef.current();
       unsubAnswersRef.current = fs.onSnapshot(
-        fs.query(
-          fs.collection(db, "rooms", code, "answers"),
-          fs.orderBy("ts", "asc"),
-          fs.limit(1000)
-        ),
-        (qs) => {
-          const arr = [];
-          qs.forEach((x) => arr.push({ id: x.id, ...x.data() }));
-          setAnswersLog(arr);
-        }
+        fs.query(fs.collection(db, "rooms", code, "answers"), fs.orderBy("ts", "asc"), fs.limit(1000)),
+        (qs) => { const arr = []; qs.forEach((x) => arr.push({ id: x.id, ...x.data() })); setAnswersLog(arr); }
       );
 
       setStage("lobby");
-      // ping presence
       const presence = setInterval(() => fs.updateDoc(playerRef, { lastSeen: fs.serverTimestamp() }).catch(() => {}), 5000);
       window.addEventListener("beforeunload", () => clearInterval(presence));
-    } catch (e) {
-      alert("Chyba připojení: " + e.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { alert("Chyba připojení: " + e.message); } finally { setLoading(false); }
   }
 
-  // Publikuj sadu otázek do místnosti (jednou), poté start
+  // Publikuj sadu otázek do místnosti (vždy override), poté start
   async function startGame() {
     const { fs, db } = await getFS(activeConfig);
     if (!room) return;
-
     const roomRef = fs.doc(db, "rooms", room.id);
     try {
-      const snap = await fs.getDoc(roomRef);
-      const data = snap.data() || {};
-      if (!data.bank?.items?.length) {
-        const toPublish = Array.isArray(localQuestions) && localQuestions.length ? localQuestions : FALLBACK_QUESTIONS;
-        await fs.updateDoc(roomRef, { bank: { items: toPublish }, solved: {} });
-      }
+      const toPublish = Array.isArray(localQuestions) && localQuestions.length ? localQuestions : FALLBACK_QUESTIONS;
+      await fs.updateDoc(roomRef, { bank: { items: toPublish }, solved: {} });
       await fs.updateDoc(roomRef, { started: true });
       setStage("game");
-    } catch (e) {
-      alert("Nelze spustit: " + e.message);
-    }
+    } catch (e) { alert("Nelze spustit: " + e.message); }
   }
 
   // Odeslání zprávy v chatu
@@ -405,48 +411,28 @@ const [flash, setFlash] = useState(null);
       const text = (chatInput || "").trim();
       if (!text || !room?.id) return;
       const { fs, db } = await getFS(activeConfig);
-      await fs.addDoc(
-        fs.collection(db, "rooms", room.id, "chat"),
-        { text, authorId: myId, authorNick: nick, ts: fs.serverTimestamp() }
-      );
+      await fs.addDoc(fs.collection(db, "rooms", room.id, "chat"), { text, authorId: myId, authorNick: nick, ts: fs.serverTimestamp() });
       setChatInput("");
-    } catch (e) {
-      alert("Nelze odeslat: " + e.message);
-    }
+    } catch (e) { alert("Nelze odeslat: " + e.message); }
   }
 
   // Skok na číslo otázky
   function doJump() {
     const n = parseInt(jumpTo, 10);
     if (!Number.isNaN(n) && n >= 1 && n <= (effectiveQuestions?.length || 0)) {
-      const idx = n - 1;
-      if (!solvedMap[idx]) setSelectedIndex(idx);
+      const idx = n - 1; if (!solvedMap[idx]) setSelectedIndex(idx);
     }
   }
 
-  // Po startu použij sdílenou sadu z roomu; jinak lokální (pre-start náhled)
-  const effectiveQuestions = useMemo(() => {
-    const shared = room?.bank?.items;
-    if (Array.isArray(shared) && shared.length) return shared;
-    return localQuestions || [];
-  }, [room?.bank?.items, localQuestions]);
-
-  const solvedMap = room?.solved || {};
-  const solvedCount = Object.keys(solvedMap).length;
-  const totalCount = effectiveQuestions.length || 0;
-  const allSolved = totalCount > 0 && solvedCount >= totalCount;
-
-  // Když je vše vyřešeno, můžeme zobrazit banner (inputy necháme vypnuté)
+  const canStart = players.length >= 2 && !room?.started;
 
   // === UI ===
   return (
     <div className="min-h-screen w-full bg-slate-50 text-slate-900 p-4 sm:p-6">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <header className="mb-6 flex items-center justify-between">
           {flash && (
-            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-xl w-[90%] bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl shadow px-4 py-3 text-sm">
-              {flash}
-            </div>
+            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-xl w-[90%] bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl shadow px-4 py-3 text-sm">{flash}</div>
           )}
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold">Síťový týmový kvíz</h1>
@@ -464,21 +450,11 @@ const [flash, setFlash] = useState(null);
           <div className="bg-white rounded-2xl shadow p-6 grid gap-4">
             <div className="grid gap-2">
               <label className="text-sm text-slate-600">Kód místnosti (A–Z, 0–9):</label>
-              <input
-                value={roomCode}
-                onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                className="border rounded-xl px-4 py-3"
-                placeholder="Např. DEVOPS"
-              />
+              <input value={roomCode} onChange={(e) => setRoomCode(e.target.value.toUpperCase())} className="border rounded-xl px-4 py-3" placeholder="Např. DEVOPS" />
             </div>
             <div className="grid gap-2">
               <label className="text-sm text-slate-600">Váš nickname:</label>
-              <input
-                value={nick}
-                onChange={(e) => setNick(e.target.value)}
-                className="border rounded-xl px-4 py-3"
-                placeholder="Např. AnsibleKing"
-              />
+              <input value={nick} onChange={(e) => setNick(e.target.value)} className="border rounded-xl px-4 py-3" placeholder="Např. AnsibleKing" />
             </div>
 
             {/* Import JSON se sadou otázek */}
@@ -487,373 +463,181 @@ const [flash, setFlash] = useState(null);
                 <h3 className="font-semibold">Import otázek (JSON)</h3>
                 <span className="text-xs text-slate-500">{fileInfo}</span>
               </div>
-              <div className="mt-3 flex flex-col sm:flex-row gap-3 items-start">
-                <input
-                  type="file"
-                  accept=".json,application/json"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    try {
-                      const qs = await loadQuestionBankFromFile(file);
-                      setLocalQuestions(qs);
-                      saveQuestionsToLS(qs);
-                      setFileInfo(`Načteno z souboru • ${qs.length} otázek`);
-                    } catch (err) {
-                      alert(err.message || String(err));
-                    }
-                  }}
-                  className="block"
-                />
-                <button
-                  className="px-4 py-2 rounded-xl bg-slate-200"
-                  onClick={async () => {
-                    clearSavedQuestions();
-                    const qs = await loadQuestionBankDefault();
-                    setLocalQuestions(qs);
-                    setFileInfo(`Výchozí sada • ${qs.length} otázek`);
-                  }}
-                >
-                  Obnovit výchozí sadu
-                </button>
+              <div className="mt-3 flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                <input type="file" accept="application/json" onChange={async (e) => {
+                  const f = e.target.files?.[0]; if (!f) return;
+                  try { const qs = await loadQuestionBankFromFile(f); setLocalQuestions(qs); saveQuestionsToLS(qs); setFileInfo(`Soubor: ${f.name} • ${qs.length} otázek`); }
+                  catch (err) { alert(String(err?.message || err)); }
+                }} />
+                <button className="px-3 py-2 rounded-xl bg-slate-100 border" onClick={() => { clearSavedQuestions(); setFileInfo("Vymazáno"); }}>Vymazat uloženou sadu</button>
               </div>
-              <p className="text-xs text-slate-500 mt-2">Formát: {`{"questions":[{"q":"Text","options":["A","B"],"answer":1,"comment":"Nepovinný komentář po správné odpovědi"}]}`}</p>
             </div>
 
             {/* Nastavení Firebase */}
-            <div className="border rounded-2xl p-4 bg-slate-50">
+            <div className="border rounded-2xl p-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold">Nastavení Firebase</h3>
-                <button className="text-sm underline" onClick={() => setShowCfg((s) => !s)}>
-                  {showCfg ? "Skrýt" : "Otevřít"}
-                </button>
+                {(cfgLockedByFile || cfgLockedByStatic) && (
+                  <span className="text-xs text-slate-500">Konfigurace je uzamčena souborem nebo staticky v kódu.</span>
+                )}
               </div>
-              {!configReady && (
-                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mt-2">
-                  Zadejte Firebase config (nebo použijte soubor <code>firebase.config.json</code> či statický blok v kódu). Uloží se do prohlížeče.
-                </p>
+              {!cfgLockedByFile && !cfgLockedByStatic && (
+                <div className="grid sm:grid-cols-2 gap-3 mt-3">
+                  {Object.entries(firebaseCfg).map(([k, v]) => (
+                    <input key={k} value={v} onChange={(e) => saveFirebaseCfg({ [k]: e.target.value })} className="border rounded-xl px-3 py-2" placeholder={k} />
+                  ))}
+                </div>
               )}
-              {(cfgLockedByFile || cfgLockedByStatic) && (
-                <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 mt-2">
-                  Konfigurace je načtena {cfgLockedByFile ? 'ze souboru /firebase.config.json' : 'ze statického bloku v kódu'} a UI je pouze informativní.
-                </p>
-              )}
+              <div className="mt-3 flex gap-3">
+                <button className="px-3 py-2 rounded-xl bg-slate-100 border" onClick={() => setShowCfg((s) => !s)}>{showCfg ? "Skrýt JSON" : "Zobrazit JSON"}</button>
+                {!cfgLockedByFile && !cfgLockedByStatic && (
+                  <button className="px-3 py-2 rounded-xl bg-rose-50 border border-rose-200" onClick={resetFirebaseCfg}>Resetovat pole</button>
+                )}
+              </div>
               {showCfg && (
-                <div className="grid sm:grid-cols-2 gap-3 mt-3">$1</div>
+                <pre className="mt-3 text-xs bg-slate-50 p-3 rounded-xl overflow-auto">{JSON.stringify(activeConfig, null, 2)}</pre>
               )}
             </div>
 
-            <button
-              onClick={joinRoom}
-              disabled={loading || !roomCode || !nick || !configReady}
-              className={classNames(
-                "px-5 py-3 rounded-2xl text-white transition shadow",
-                loading || !roomCode || !nick || !configReady ? "bg-slate-400" : "bg-slate-900 hover:opacity-90"
-              )}
-            >
-              Připojit se
-            </button>
-            <p className="text-xs text-slate-500">
-              Pokud nevložíte vlastní JSON, použije se výchozí sada. Při startu hry se aktivní sada **publikuje do místnosti**.
-            </p>
+            <div className="flex gap-3 justify-end">
+              <button disabled={!configReady || !roomCode || !nick || loading} onClick={joinRoom} className={classNames("px-4 py-3 rounded-2xl text-white", (!configReady || !roomCode || !nick || loading) ? "bg-slate-400" : "bg-slate-900 hover:bg-slate-800")}>{loading ? "Připojuji…" : "Připojit"}</button>
+            </div>
           </div>
         )}
 
         {stage === "lobby" && (
-          <div className="bg-white rounded-2xl shadow p-6 grid gap-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Lobby</h2>
-              <div className="text-sm text-slate-600">Hráčů: {players.length} / 5</div>
-            </div>
-            <ul className="grid sm:grid-cols-2 gap-2">
-              {players.map((p) => (
-                <li key={p.id} className="border rounded-xl px-3 py-2 flex items-center justify-between">
-                  <span>{p.nickname}</span>
-                  <span className="text-slate-500 text-sm">{p.score ?? 0} b.</span>
-                </li>
-              ))}
-            </ul>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={startGame}
-                  disabled={!canStart}
-                  className={classNames(
-                    "px-5 py-3 rounded-2xl text-white transition shadow",
-                    !canStart ? "bg-slate-400" : "bg-emerald-600 hover:opacity-90"
-                  )}
-                >
-                  Start (publikuje sadu do místnosti)
-                </button>
-                {!canStart && (
-                  <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                    {(!configReady)
-                      ? "Vyplňte Nastavení Firebase."
-                      : room?.started
-                        ? "Hra už běží v této místnosti."
-                        : players.length < 2
-                          ? "Potřebujete alespoň 2 hráče pro start."
-                          : players.length > 5
-                            ? "Maximálně 5 hráčů v místnosti."
-                            : null}
-                  </div>
-                )}
+          <div className="grid lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-white rounded-2xl shadow p-6">
+              <h3 className="font-semibold mb-2">Hráči</h3>
+              <div className="flex flex-wrap gap-2">
+                {players.map((p) => (
+                  <span key={p.id} className="px-3 py-1 rounded-full bg-slate-100 border">{p.nickname}</span>
+                ))}
               </div>
-
-            {/* Chat v lobby */}
-            <div className="grid gap-2">
-              <h3 className="text-lg font-semibold">Chat</h3>
-              <div ref={chatBoxRef} className="h-48 overflow-y-auto border rounded-xl p-3 bg-slate-50">
-                {chatMessages.length === 0 ? (
-                  <div className="text-sm text-slate-500">Zatím žádné zprávy.</div>
-                ) : (
-                  <ul className="space-y-1.5">
-                    {chatMessages.map((m) => (
-                      <li key={m.id} className="text-sm">
-                        <span className="font-medium">{m.authorNick || "?"}:</span> <span>{m.text}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  value={chatInput}
-                  onChange={(e)=>setChatInput(e.target.value)}
-                  onKeyDown={(e)=>{ if(e.key==='Enter'){ e.preventDefault(); sendChat(); }}}
-                  className="flex-1 border rounded-xl px-3 py-2" placeholder="Napište zprávu…"
-                />
-                <button onClick={sendChat} className="px-4 py-2 rounded-xl bg-slate-900 text-white">Odeslat</button>
+              <div className="mt-3 text-sm text-slate-600">Sada k publikaci: <strong>{(Array.isArray(localQuestions) && localQuestions.length ? localQuestions.length : FALLBACK_QUESTIONS.length)}</strong> otázek</div>
+              <div className="mt-4 flex items-center gap-3">
+                <button disabled={!canStart} onClick={startGame} className={classNames("px-4 py-2 rounded-2xl text-white", canStart ? "bg-emerald-600 hover:bg-emerald-500" : "bg-slate-400")}>Start</button>
+                {!canStart && <span className="text-sm text-slate-500">Potřeba alespoň 2 hráči a nezahájená hra.</span>}
               </div>
             </div>
-
+            <div className="bg-white rounded-2xl shadow p-6">
+              <h3 className="font-semibold mb-2">Chat</h3>
+              <div ref={chatBoxRef} className="h-64 overflow-auto border rounded-xl p-3 bg-slate-50">
+                {chatMessages.map((m) => (
+                  <div key={m.id} className="text-sm mb-1"><span className="font-semibold">{m.authorNick}:</span> {m.text}</div>
+                ))}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} className="border rounded-xl px-3 py-2 flex-1" placeholder="Napiš zprávu…" />
+                <button onClick={sendChat} className="px-3 py-2 rounded-xl bg-slate-900 text-white">Odeslat</button>
+              </div>
+            </div>
           </div>
         )}
 
-        {(stage === "game") && (
-          <div className="grid lg:grid-cols-[2fr_1fr] gap-6">
-            {/* Levý panel – otázky */}
-            <div className="bg-white rounded-2xl shadow p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold">Otázky</h2>
-                {allSolved ? (
-                  <div className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-sm font-medium">
-                    Hotovo! Všechny otázky vyřešeny 🎉 Váš kód je 2289
-                  </div>
-                ) : lockRemaining > 0 ? (
-                  <div className="px-3 py-1 rounded-full bg-red-100 text-red-700 text-sm font-medium">
-                    Pauza {lockRemaining}s – způsobil: <span className="font-semibold">{room?.lockedBy}</span>
-                  </div>
-                ) : (
-                  <div className="text-sm text-slate-500">Vyberte číslo otázky • Vyřešeno {solvedCount}/{totalCount}</div>
-                )}
-              </div>
-
-              {/* Ovládání výběru */}
-              <div className="flex items-center gap-3 text-xs text-slate-600 mb-2">
+        {stage === "game" && (
+          <div className="grid lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-white rounded-2xl shadow p-6">
+              <div className="flex flex-wrap items-center gap-3 mb-4">
                 <label className="inline-flex items-center gap-2">
-                  <input type="checkbox" className="accent-slate-900" checked={showOnlyUnsolved} onChange={(e)=>setShowOnlyUnsolved(e.target.checked)} />
+                  <input type="checkbox" className="accent-slate-900" checked={showOnlyUnsolved} onChange={(e) => setShowOnlyUnsolved(e.target.checked)} />
                   Jen nevyřešené
                 </label>
-                <div className="flex items-center gap-1">
-                  <span>Jít na #</span>
-                  <input value={jumpTo} onChange={(e)=>setJumpTo(e.target.value)} onKeyDown={(e)=>{ if(e.key==='Enter'){ e.preventDefault(); doJump(); }}}
-                    className="w-16 border rounded-lg px-2 py-1" placeholder="např. 42" />
-                  <button onClick={doJump} className="px-2.5 py-1 rounded-lg border">Jít</button>
+                <label className="inline-flex items-center gap-2">
+                  <input type="checkbox" className="accent-slate-900" checked={openInWindow} onChange={(e) => setOpenInWindow(e.target.checked)} />
+                  Otevírat v novém okně
+                </label>
+                <div className="ml-auto flex items-center gap-2 text-sm">
+                  <span>Skok na #</span>
+                  <input value={jumpTo} onChange={(e) => setJumpTo(e.target.value)} className="border rounded-lg px-2 py-1 w-20" />
+                  <button onClick={doJump} className="px-3 py-1 rounded-lg bg-slate-100 border">Jít</button>
                 </div>
               </div>
 
-              {/* Grid čísel otázek */}
-              <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5">
-                {Array.from({ length: effectiveQuestions.length }, (_, i) => i)
-                  .filter((i) => !showOnlyUnsolved || !solvedMap[i])
-                  .map((i) => {
+              {/* Lock overlay */}
+              {lockRemaining > 0 && (
+                <div className="mb-3 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm">
+                  Pauza {lockRemaining}s – způsobil: <strong>{room?.lockedBy || "neznámý"}</strong>
+                </div>
+              )}
+
+              {/* Grid otázek */}
+              <div className="grid grid-cols-10 sm:grid-cols-12 md:grid-cols-14 lg:grid-cols-16 gap-2">
+                {effectiveQuestions.map((q, i) => {
                   const done = !!solvedMap[i];
+                  if (showOnlyUnsolved && done) return null;
                   return (
-                    <button
-                      key={i}
-                      onClick={() => !done && setSelectedIndex(i)}
-                      disabled={lockRemaining > 0 || done || allSolved}
+                    <button key={i} disabled={lockRemaining > 0}
                       className={classNames(
-                        "w-9 h-9 rounded-lg border text-[11px] font-mono flex items-center justify-center",
-                        done ? "bg-emerald-50 border-emerald-300 text-emerald-700" : (lockRemaining > 0 || allSolved) ? "opacity-50 cursor-not-allowed" : "hover:bg-slate-50"
+                        "h-9 w-9 sm:h-10 sm:w-10 rounded-lg border text-sm font-medium",
+                        done ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-white border-slate-200 hover:bg-slate-50",
+                        lockRemaining > 0 && "opacity-60 cursor-not-allowed"
                       )}
-                      title={`Otázka ${i + 1}${done ? " (vyřešeno)" : ""}`}
-                    >
-                      {i + 1}
-                    </button>
+                      onClick={() => (openInWindow ? openQuestionPopup(i) : setSelectedIndex(i))}
+                      title={q.q}
+                    >{i + 1}</button>
                   );
                 })}
               </div>
 
-              {/* Panel s vybranou otázkou */}
-              {selectedIndex != null && effectiveQuestions[selectedIndex] && (
-                <div className="mt-6 border-t pt-6">
-                  <div className="flex items-start gap-3 mb-3">
-                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg border font-mono">{selectedIndex + 1}</span>
-                    <h3 className="text-lg font-semibold">{effectiveQuestions[selectedIndex].q}</h3>
-                  </div>
+              {/* Inline panel otázek (když není popup) */}
+              {!openInWindow && selectedIndex != null && effectiveQuestions[selectedIndex] && (
+                <div className="mt-5 border rounded-2xl p-4">
+                  <div className="text-sm text-slate-500 mb-1">Otázka #{selectedIndex + 1}</div>
+                  <div className="font-medium mb-3">{effectiveQuestions[selectedIndex].q}</div>
                   <div className="grid gap-2">
-                    {effectiveQuestions[selectedIndex].options.map((opt, oi) => (
-                      <button
-                        key={oi}
-                        onClick={() => {
-                          (async () => {
-                            if (!configReady || allSolved) return;
-                            const { fs, db } = await getFS(activeConfig);
-                            const rRef = fs.doc(db, "rooms", normalizeRoom(roomCode));
-
-                            // Pokud už je otázka vyřešena (race), jen zavřít
-                            if (solvedMap[selectedIndex]) { setSelectedIndex(null); return; }
-
-                            const q = effectiveQuestions[selectedIndex];
-                            const ok = oi === q.answer;
-                            if (ok) {
-                              try {
-                                // 1) přičti skóre hráči
-                                await fs.updateDoc(fs.doc(db, "rooms", normalizeRoom(roomCode), "players", myId), { score: fs.increment(1) });
-                                // 2) označ otázku za vyřešenou (globálně)
-                                const patch = {}; patch[`solved.${selectedIndex}`] = true;
-                                await fs.updateDoc(rRef, patch);
-                                // 3) log odpovědi (správně) + volitelný komentář ze sady
-                                try {
-                                  const cm = ((effectiveQuestions[selectedIndex]?.comment) || "").trim();
-                                  await fs.addDoc(
-                                    fs.collection(db, "rooms", normalizeRoom(roomCode), "answers"),
-                                    { qIndex: selectedIndex, correct: true, authorId: myId, authorNick: nick, comment: cm || null, ts: fs.serverTimestamp() }
-                                  );
-                                  if (cm) {
-                                    setFlash(`Hint: ${cm}`);
-                                    setTimeout(() => setFlash(null), 6000);
-                                  }
-                                } catch (e) { console.error("Log correct answer failed", e); }
-                              } catch (e) { console.error(e); }
-                              setSelectedIndex(null);
-                            } else {
-                              try {
-                                await fs.runTransaction(db, async (tx) => {
-                                  const snap = await tx.get(rRef);
-                                  const data = snap.data() || {};
-                                  const now = Date.now();
-                                  const startMs = data.lockedAt?.toMillis ? data.lockedAt.toMillis() : data.lockedAt || 0;
-                                  const active = startMs && now < startMs + PENALTY_MS;
-                                  if (active) return;
-                                  tx.update(rRef, { lockedAt: (await getFS(activeConfig)).fs.serverTimestamp(), lockedBy: nick });
-                                });
-                              // zapiš do logu pokus (špatně)
-                              try {
-                                await fs.addDoc(
-                                  fs.collection(db, "rooms", normalizeRoom(roomCode), "answers"),
-                                  { qIndex: selectedIndex, correct: false, authorId: myId, authorNick: nick, choice: oi, ts: fs.serverTimestamp() }
-                                );
-                              } catch (err) { console.error("Log wrong answer failed", err); }
-                              } catch (e) { console.error("Lock TX failed", e); }
-                            }
-                          })();
-                        }}
-                        disabled={lockRemaining > 0 || allSolved}
-                        className={classNames(
-                          "w-full text-left border rounded-xl px-4 py-3 transition",
-                          lockRemaining > 0 || allSolved ? "opacity-50 cursor-not-allowed" : "hover:bg-slate-50"
-                        )}
-                        title={`Odpověď ${oi + 1}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg border text-sm">{oi + 1}</span>
-                          <span>{opt}</span>
-                        </div>
-                      </button>
+                    {effectiveQuestions[selectedIndex].options.map((t, idx) => (
+                      <button key={idx} disabled={lockRemaining > 0}
+                        onClick={() => submitAnswerInline(selectedIndex, idx)}
+                        className={classNames("text-left px-3 py-2 rounded-xl border",
+                          lockRemaining > 0 ? "bg-slate-100 cursor-not-allowed" : "bg-white hover:bg-slate-50")}
+                      >{t}</button>
                     ))}
                   </div>
                 </div>
               )}
-            </div>
 
-            {/* Pravý panel – skóre */}
-            <aside className="bg-white rounded-2xl shadow p-6">
-              <h2 className="text-xl font-semibold mb-3">Skóre</h2>
-              <ol className="grid gap-2">
-                {players.slice().sort((a,b) => (b.score||0)-(a.score||0)).map((p, idx) => (
-                  <li key={p.id} className="border rounded-xl px-3 py-2 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 text-right text-slate-500">{idx + 1}.</span>
-                      <span className={classNames("font-medium", p.id === myId && "text-slate-900")}>{p.nickname}</span>
-                    </div>
-                    <span className="font-mono">{p.score ?? 0}</span>
-                  </li>
-                ))}
-              </ol>
-              <div className="mt-6 text-xs text-slate-500">
-                {allSolved ? (
-                  <div className="grid gap-2">
-                    <span>Kvíz dokončen. Gratulace týmu!</span>
-                    <button onClick={() => setShowLog((s)=>!s)} className="w-full px-3 py-2 rounded-xl border">
-                      {showLog ? 'Skrýt log odpovědí' : `Zobrazit log odpovědí (${answersLog.length})`}
-                    </button>
-                    {showLog && (
-                      <div className="max-h-64 overflow-y-auto border rounded-xl p-3 bg-slate-50 text-left">
-                        {answersLog.length === 0 ? (
-                          <div className="text-slate-500">Žádné záznamy.</div>
-                        ) : (
-                          <ul className="space-y-2">
-                            {answersLog.map((e, idx) => (
-                              <li key={e.id || idx} className="text-sm">
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <span className="font-mono">#{(e.qIndex ?? 0) + 1}</span>
-                                    <span className={"ml-2 px-1.5 py-0.5 rounded text-xs " + (e.correct ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700")}>{e.correct ? "správně" : "špatně"}</span>
-                                    <span className="ml-2 text-slate-700">{e.authorNick}</span>
-                                  </div>
-                                  <div className="text-[11px] text-slate-500">{(e.ts?.toDate ? e.ts.toDate() : (e.ts? new Date(e.ts): null))?.toLocaleString?.() || ""}</div>
-                                </div>
-                                {e.correct && e.comment && (
-                                  <div className="mt-1 text-[12px] text-slate-700">Hint: {e.comment}</div>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <span>Špatná odpověď kohokoliv spouští 10s pauzu pro všechny. Vyřešeno {solvedCount}/{totalCount}.</span>
+              {/* Stav */}
+              <div className="mt-5 text-sm text-slate-600">
+                Vyřešeno: <strong>{solvedCount}/{totalCount}</strong>
+                {allSolved && (
+                  <span className="ml-2 inline-block px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">Kód Vaší mise je 2289</span>
                 )}
               </div>
+            </div>
 
-              {/* Chat */}
-              <div className="mt-6">
-                <h3 className="text-lg font-semibold mb-2">Chat</h3>
-                <div ref={chatBoxRef} className="h-56 overflow-y-auto border rounded-xl p-3 bg-slate-50">
-                  {chatMessages.length === 0 ? (
-                    <div className="text-sm text-slate-500">Zatím žádné zprávy.</div>
-                  ) : (
-                    <ul className="space-y-1.5">
-                      {chatMessages.map((m) => (
-                        <li key={m.id} className="text-sm">
-                          <span className="font-medium">{m.authorNick || "?"}:</span> <span>{m.text}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                <div className="flex gap-2 mt-2">
-                  <input
-                    value={chatInput}
-                    onChange={(e)=>setChatInput(e.target.value)}
-                    onKeyDown={(e)=>{ if(e.key==='Enter'){ e.preventDefault(); sendChat(); }}}
-                    className="flex-1 border rounded-xl px-3 py-2" placeholder="Napište zprávu…"
-                  />
-                  <button onClick={sendChat} className="px-4 py-2 rounded-xl bg-slate-900 text-white">Odeslat</button>
-                </div>
+            {/* Chat + log */}
+            <div className="bg-white rounded-2xl shadow p-6">
+              <h3 className="font-semibold mb-2">Chat</h3>
+              <div ref={chatBoxRef} className="h-56 overflow-auto border rounded-xl p-3 bg-slate-50">
+                {chatMessages.map((m) => (
+                  <div key={m.id} className="text-sm mb-1"><span className="font-semibold">{m.authorNick}:</span> {m.text}</div>
+                ))}
               </div>
-            </aside>
+              <div className="mt-2 flex gap-2">
+                <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} className="border rounded-xl px-3 py-2 flex-1" placeholder="Napiš zprávu…" />
+                <button onClick={sendChat} className="px-3 py-2 rounded-xl bg-slate-900 text-white">Odeslat</button>
+              </div>
+
+              <div className="mt-6 flex items-center justify-between">
+                <h4 className="font-semibold">Log odpovědí</h4>
+                <button disabled={!allSolved} onClick={() => setShowLog((s) => !s)} className={classNames("px-3 py-1 rounded-lg border", allSolved ? "bg-slate-100" : "bg-slate-100 opacity-50 cursor-not-allowed")}>{showLog ? "Skrýt" : "Zobrazit"}</button>
+              </div>
+              {showLog && (
+                <div className="mt-2 h-48 overflow-auto border rounded-xl p-3 bg-slate-50 text-sm">
+                  {answersLog.length === 0 && <div className="text-slate-500">(zatím prázdné)</div>}
+                  {answersLog.map((a) => (
+                    <div key={a.id} className="py-1 border-b border-slate-200/60 last:border-none">
+                      <div><strong>#{(a.qIndex ?? 0) + 1}</strong> – {a.correct ? "správně" : "špatně"} – {a.authorNick}</div>
+                      {a.comment && <div className="text-slate-600">Hint: {a.comment}</div>}
+                      <div className="text-xs text-slate-500">{a.ts?.toDate ? a.ts.toDate().toLocaleString() : ""}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
-
-        {/* Footer */}
-        <footer className="mt-6 text-center text-xs text-slate-500">
-          Tip: Importujte vlastní <code>questions.json</code> výše; nebo vložte soubor ve formátu {`{"questions":[{"q":"Text","options":["A","B"],"answer":1}]}`}.
-        </footer>
       </div>
     </div>
   );
