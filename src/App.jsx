@@ -198,7 +198,8 @@ export default function TeamQuizRealtime() {
   const unsubRoomRef = useRef(null);
   const unsubPlayersRef = useRef(null);
   const lockTimerRef = useRef(null);
-  const effectiveQuestionsRef = useRef([]); // pro listener z popupu (vyhne se TDZ)
+  const effectiveQuestionsRef = useRef([]);
+  const fanfarePlayedRef = useRef(false); // pro listener z popupu (vyhne se TDZ)
 
   // Načti lokální sadu (fallback nebo uložený import)
   useEffect(() => {
@@ -248,6 +249,9 @@ export default function TeamQuizRealtime() {
   const solvedCount = Object.keys(solvedMap).length;
   const totalCount = effectiveQuestions.length || 0;
   const allSolved = totalCount > 0 && solvedCount >= totalCount;
+
+  // Pusť fanfáru po dokončení
+  useEffect(() => { if (allSolved) playFanfare(); }, [allSolved]);
 
   // Listener pro pop‑up okna – přijímá odpovědi a vrací výsledek
   useEffect(() => {
@@ -299,6 +303,33 @@ export default function TeamQuizRealtime() {
 
   async function submitAnswerInline(qIndex, choice) {
     return submitAnswerFromPopup(qIndex, choice, null);
+  }
+
+  // Fanfára – přehraj krátkou sekvenci tónů (bez externích souborů)
+  function playFanfare(){
+    try{
+      if (fanfarePlayedRef.current) return;
+      fanfarePlayedRef.current = true;
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+      const notes = [
+        {f:523.25, t:0.00, d:0.20, g:0.5}, // C5
+        {f:659.25, t:0.22, d:0.20, g:0.5}, // E5
+        {f:783.99, t:0.44, d:0.25, g:0.5}, // G5
+        {f:1046.50,t:0.72, d:0.35, g:0.6}, // C6
+      ];
+      notes.forEach(n=>{
+        const o=ctx.createOscillator(); const g=ctx.createGain();
+        o.type='triangle'; o.frequency.setValueAtTime(n.f, now+n.t);
+        g.gain.setValueAtTime(0.0001, now+n.t);
+        g.gain.exponentialRampToValueAtTime(n.g, now+n.t+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, now+n.t+n.d);
+        o.connect(g).connect(ctx.destination);
+        o.start(now+n.t); o.stop(now+n.t+n.d+0.05);
+      });
+      setTimeout(()=>{ try{ctx.close();}catch{} }, 2000);
+    }catch(e){ /* ignore */ }
   }
 
   function openQuestionPopup(idx) {
@@ -436,6 +467,9 @@ export default function TeamQuizRealtime() {
           input::placeholder, textarea::placeholder{ color:#64748b !important; }
           input:-webkit-autofill, textarea:-webkit-autofill, select:-webkit-autofill{ -webkit-text-fill-color:#0f172a !important; box-shadow: 0 0 0px 1000px #fff inset !important; }
           button.quiz-num{ display:flex; align-items:center; justify-content:center; }
+          .mission-banner{animation:blink .9s steps(2,start) infinite; box-shadow:0 0 0 4px rgba(16,185,129,.25), 0 0 30px rgba(16,185,129,.35)}
+          @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+          @media (prefers-reduced-motion: reduce){.mission-banner{animation:none}}
         `}</style>
         <header className="mb-6 flex items-center justify-between">
           {flash && (
@@ -608,7 +642,7 @@ export default function TeamQuizRealtime() {
               <div className="mt-5 text-sm text-slate-600">
                 Vyřešeno: <strong>{solvedCount}/{totalCount}</strong>
                 {allSolved && (
-                  <span className="ml-2 inline-block px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">Kód Vaší mise je 2289</span>
+                  <div className="mission-banner mt-3 w-full text-center text-2xl sm:text-4xl font-extrabold tracking-wide text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3">Kód Vaší mise je 2289</div>
                 )}
               </div>
             </div>
