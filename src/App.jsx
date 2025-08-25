@@ -40,10 +40,10 @@ let _initialized = false;
 async function getFS(activeConfig) {
   if (_fs && _db && _initialized) return { fs: _fs, db: _db };
   const { initializeApp } = await import(
-    `https://www.gstatic.com/firebasejs/${FIREBASE_JS_VER}/firebase-app.js`
+    /* @vite-ignore */ `https://www.gstatic.com/firebasejs/${FIREBASE_JS_VER}/firebase-app.js`
   );
   const fs = await import(
-    `https://www.gstatic.com/firebasejs/${FIREBASE_JS_VER}/firebase-firestore.js`
+    /* @vite-ignore */ `https://www.gstatic.com/firebasejs/${FIREBASE_JS_VER}/firebase-firestore.js`
   );
   const app = initializeApp(activeConfig);
   const db = fs.getFirestore(app);
