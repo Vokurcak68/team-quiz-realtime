@@ -328,7 +328,7 @@ export default function TeamQuizRealtime() {
   function send(choice){ try{ window.opener && window.opener.postMessage({type:'popup-answer', qIndex, choice}, '*'); }catch(e){} }
   const box=document.getElementById('opts');
   options.forEach((t,i)=>{ const b=document.createElement('button'); b.className='opt'; b.textContent=t; b.onclick=()=>{ send(i); Array.from(box.children).forEach(x=>x.disabled=true); }; box.appendChild(b); });
-  window.addEventListener('message', (ev)=>{ const d=ev.data||{}; if(d.type==='popup-result' && d.qIndex===qIndex){ const el=document.getElementById('info'); if(d.correct){ el.textContent = d.comment? ('Správně! Hint:'+d.comment) : 'Správně!'; setTimeout(()=>{ window.close(); }, 1200); } else { el.textContent = 'Špatně. Pauza 10 s…'; setTimeout(()=>{ el.textContent='Zkuste znovu.'; Array.from(box.children).forEach(x=>x.disabled=false); }, 10000); } }});
+  window.addEventListener('message', (ev)=>{ const d=ev.data||{}; if(d.type==='popup-result' && d.qIndex===qIndex){ const el=document.getElementById('info'); if(d.correct){ el.textContent = d.comment? ('Správně! '+d.comment) : 'Správně!'; setTimeout(()=>{ window.close(); }, 1200); } else { el.textContent = 'Špatně. Pauza 10 s…'; setTimeout(()=>{ el.textContent='Zkuste znovu.'; Array.from(box.children).forEach(x=>x.disabled=false); }, 10000); } }});
 </script>
 </body></html>`;
       w.document.open(); w.document.write(html); w.document.close();
@@ -430,6 +430,13 @@ export default function TeamQuizRealtime() {
   return (
     <div className="min-h-screen w-full bg-slate-50 text-slate-900 p-4 sm:p-6">
       <div className="max-w-6xl mx-auto">
+        <style>{`
+          :root{ color-scheme: light; }
+          input, textarea, select{ background:#fff !important; color:#0f172a !important; }
+          input::placeholder, textarea::placeholder{ color:#64748b !important; }
+          input:-webkit-autofill, textarea:-webkit-autofill, select:-webkit-autofill{ -webkit-text-fill-color:#0f172a !important; box-shadow: 0 0 0px 1000px #fff inset !important; }
+          button.quiz-num{ display:flex; align-items:center; justify-content:center; }
+        `}</style>
         <header className="mb-6 flex items-center justify-between">
           {flash && (
             <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-xl w-[90%] bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl shadow px-4 py-3 text-sm">{flash}</div>
@@ -450,11 +457,11 @@ export default function TeamQuizRealtime() {
           <div className="bg-white rounded-2xl shadow p-6 grid gap-4">
             <div className="grid gap-2">
               <label className="text-sm text-slate-600">Kód místnosti (A–Z, 0–9):</label>
-              <input value={roomCode} onChange={(e) => setRoomCode(e.target.value.toUpperCase())} className="border rounded-xl px-4 py-3" placeholder="Např. DEVOPS" />
+              <input value={roomCode} onChange={(e) => setRoomCode(e.target.value.toUpperCase())} className="border rounded-xl px-4 py-3 bg-white text-slate-900 placeholder-slate-400 [color-scheme:light]" placeholder="Např. DEVOPS" />
             </div>
             <div className="grid gap-2">
               <label className="text-sm text-slate-600">Váš nickname:</label>
-              <input value={nick} onChange={(e) => setNick(e.target.value)} className="border rounded-xl px-4 py-3" placeholder="Např. AnsibleKing" />
+              <input value={nick} onChange={(e) => setNick(e.target.value)} className="border rounded-xl px-4 py-3 bg-white text-slate-900 placeholder-slate-400 [color-scheme:light]" placeholder="Např. AnsibleKing" />
             </div>
 
             {/* Import JSON se sadou otázek */}
@@ -484,7 +491,7 @@ export default function TeamQuizRealtime() {
               {!cfgLockedByFile && !cfgLockedByStatic && (
                 <div className="grid sm:grid-cols-2 gap-3 mt-3">
                   {Object.entries(firebaseCfg).map(([k, v]) => (
-                    <input key={k} value={v} onChange={(e) => saveFirebaseCfg({ [k]: e.target.value })} className="border rounded-xl px-3 py-2" placeholder={k} />
+                    <input key={k} value={v} onChange={(e) => saveFirebaseCfg({ [k]: e.target.value })} className="border rounded-xl px-3 py-2 bg-white text-slate-900 placeholder-slate-400 [color-scheme:light]" placeholder={k} />
                   ))}
                 </div>
               )}
@@ -528,7 +535,7 @@ export default function TeamQuizRealtime() {
                 ))}
               </div>
               <div className="mt-2 flex gap-2">
-                <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} className="border rounded-xl px-3 py-2 flex-1" placeholder="Napiš zprávu…" />
+                <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} className="border rounded-xl px-3 py-2 flex-1 bg-white text-slate-900 placeholder-slate-400 [color-scheme:light]" placeholder="Napiš zprávu…" />
                 <button onClick={sendChat} className="px-3 py-2 rounded-xl bg-slate-900 text-white">Odeslat</button>
               </div>
             </div>
@@ -549,7 +556,7 @@ export default function TeamQuizRealtime() {
                 </label>
                 <div className="ml-auto flex items-center gap-2 text-sm">
                   <span>Skok na #</span>
-                  <input value={jumpTo} onChange={(e) => setJumpTo(e.target.value)} className="border rounded-lg px-2 py-1 w-20" />
+                  <input value={jumpTo} onChange={(e) => setJumpTo(e.target.value)} className="border rounded-lg px-2 py-1 w-20 bg-white text-slate-900 placeholder-slate-400 [color-scheme:light]" />
                   <button onClick={doJump} className="px-3 py-1 rounded-lg bg-slate-100 border">Jít</button>
                 </div>
               </div>
@@ -562,14 +569,14 @@ export default function TeamQuizRealtime() {
               )}
 
               {/* Grid otázek */}
-              <div className="grid grid-cols-10 sm:grid-cols-12 md:grid-cols-14 lg:grid-cols-16 gap-2">
+              <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(2.5rem,1fr))] sm:[grid-template-columns:repeat(auto-fill,minmax(2.75rem,1fr))]">
                 {effectiveQuestions.map((q, i) => {
                   const done = !!solvedMap[i];
                   if (showOnlyUnsolved && done) return null;
                   return (
                     <button key={i} disabled={lockRemaining > 0}
                       className={classNames(
-                        "h-9 w-9 sm:h-10 sm:w-10 rounded-lg border text-sm font-medium",
+                        "aspect-square w-full rounded-lg border text-sm font-medium flex items-center justify-center quiz-num",
                         done ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-white border-slate-200 hover:bg-slate-50",
                         lockRemaining > 0 && "opacity-60 cursor-not-allowed"
                       )}
@@ -615,7 +622,7 @@ export default function TeamQuizRealtime() {
                 ))}
               </div>
               <div className="mt-2 flex gap-2">
-                <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} className="border rounded-xl px-3 py-2 flex-1" placeholder="Napiš zprávu…" />
+                <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} className="border rounded-xl px-3 py-2 flex-1 bg-white text-slate-900 placeholder-slate-400 [color-scheme:light]" placeholder="Napiš zprávu…" />
                 <button onClick={sendChat} className="px-3 py-2 rounded-xl bg-slate-900 text-white">Odeslat</button>
               </div>
 
