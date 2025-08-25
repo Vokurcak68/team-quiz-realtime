@@ -1,0 +1,37 @@
+{
+  "questions": [
+    {
+      "q": "Do které řeky se vlévá Vltava?",
+      "options": [
+        "Do Labe",
+        "Do Moravy",
+        "Do Dunaje",
+        "Do Odry"
+      ],
+      "answer": 0,
+      "comment": "Mělník"
+    },
+    {
+      "q": "V jakém pohoří leží Sněžka?",
+      "options": [
+        "Beskydy",
+        "Krkonoše",
+        "Šumava",
+        "Jeseníky"
+      ],
+      "answer": 1,
+      "comment": ""
+    },
+    {
+      "q": "Které město je známé výrobou škodovek?",
+      "options": [
+        "Mladá Boleslav",
+        "Plzeň",
+        "Brno",
+        "Ostrava"
+      ],
+      "answer": 0,
+      "comment": "Auto"
+    }
+  ]
+}
