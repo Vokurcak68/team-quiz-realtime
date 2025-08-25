@@ -112,9 +112,7 @@ function validateQuestions(payload) {
     const options = Array.isArray(item.options) ? item.options.filter((o) => typeof o === "string") : [];
     const answer = Number.isInteger(item.answer) ? item.answer : -1;
     if (options.length < 2 || answer < 0 || answer >= options.length) continue;
-    // nový volitelný atribut: comment (zpětně kompatibilní s dřívějším explanation)
-    const comment = typeof item.comment === 'string' ? item.comment : (typeof item.explanation === 'string' ? item.explanation : "");
-    clean.push({ q: item.q, options, answer, comment });
+    clean.push({ q: item.q, options, answer, explanation: item.explanation || "" });
   }
   return clean;
 }
@@ -207,10 +205,6 @@ const [chatMessages, setChatMessages] = useState([]);
 const [chatInput, setChatInput] = useState("");
 const chatBoxRef = useRef(null);
 const unsubChatRef = useRef(null);
-const unsubAnswersRef = useRef(null);
-const [answersLog, setAnswersLog] = useState([]);
-const [showLog, setShowLog] = useState(false);
-const [flash, setFlash] = useState(null);
 
   // Podmínky pro aktivaci Start
   const canStart = useMemo(() => {
@@ -353,21 +347,6 @@ const [flash, setFlash] = useState(null);
         }
       );
 
-      // Answers log subscription
-      unsubAnswersRef.current && unsubAnswersRef.current();
-      unsubAnswersRef.current = fs.onSnapshot(
-        fs.query(
-          fs.collection(db, "rooms", code, "answers"),
-          fs.orderBy("ts", "asc"),
-          fs.limit(1000)
-        ),
-        (qs) => {
-          const arr = [];
-          qs.forEach((x) => arr.push({ id: x.id, ...x.data() }));
-          setAnswersLog(arr);
-        }
-      );
-
       setStage("lobby");
       // ping presence
       const presence = setInterval(() => fs.updateDoc(playerRef, { lastSeen: fs.serverTimestamp() }).catch(() => {}), 5000);
@@ -443,11 +422,6 @@ const [flash, setFlash] = useState(null);
     <div className="min-h-screen w-full bg-slate-50 text-slate-900 p-4 sm:p-6">
       <div className="max-w-5xl mx-auto">
         <header className="mb-6 flex items-center justify-between">
-          {flash && (
-            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-xl w-[90%] bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl shadow px-4 py-3 text-sm">
-              {flash}
-            </div>
-          )}
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold">Síťový týmový kvíz</h1>
             <p className="text-slate-600 text-sm">Týmový režim • kvíz končí po vyřešení všech otázek • špatná odpověď = 10s pauza</p>
@@ -517,7 +491,7 @@ const [flash, setFlash] = useState(null);
                   Obnovit výchozí sadu
                 </button>
               </div>
-              <p className="text-xs text-slate-500 mt-2">Formát: {`{"questions":[{"q":"Text","options":["A","B"],"answer":1,"comment":"Nepovinný komentář po správné odpovědi"}]}`}</p>
+              <p className="text-xs text-slate-500 mt-2">Formát: {`{"questions":[{"q":"Text","options":["A","B"],"answer":1}]}`}</p>
             </div>
 
             {/* Nastavení Firebase */}
@@ -714,18 +688,6 @@ const [flash, setFlash] = useState(null);
                                 // 2) označ otázku za vyřešenou (globálně)
                                 const patch = {}; patch[`solved.${selectedIndex}`] = true;
                                 await fs.updateDoc(rRef, patch);
-                                // 3) log odpovědi (správně) + volitelný komentář ze sady
-                                try {
-                                  const cm = ((effectiveQuestions[selectedIndex]?.comment) || "").trim();
-                                  await fs.addDoc(
-                                    fs.collection(db, "rooms", normalizeRoom(roomCode), "answers"),
-                                    { qIndex: selectedIndex, correct: true, authorId: myId, authorNick: nick, comment: cm || null, ts: fs.serverTimestamp() }
-                                  );
-                                  if (cm) {
-                                    setFlash(`Komentář: ${cm}`);
-                                    setTimeout(() => setFlash(null), 6000);
-                                  }
-                                } catch (e) { console.error("Log correct answer failed", e); }
                               } catch (e) { console.error(e); }
                               setSelectedIndex(null);
                             } else {
@@ -739,13 +701,6 @@ const [flash, setFlash] = useState(null);
                                   if (active) return;
                                   tx.update(rRef, { lockedAt: (await getFS(activeConfig)).fs.serverTimestamp(), lockedBy: nick });
                                 });
-                              // zapiš do logu pokus (špatně)
-                              try {
-                                await fs.addDoc(
-                                  fs.collection(db, "rooms", normalizeRoom(roomCode), "answers"),
-                                  { qIndex: selectedIndex, correct: false, authorId: myId, authorNick: nick, choice: oi, ts: fs.serverTimestamp() }
-                                );
-                              } catch (err) { console.error("Log wrong answer failed", err); }
                               } catch (e) { console.error("Lock TX failed", e); }
                             }
                           })();
@@ -784,37 +739,7 @@ const [flash, setFlash] = useState(null);
               </ol>
               <div className="mt-6 text-xs text-slate-500">
                 {allSolved ? (
-                  <div className="grid gap-2">
-                    <span>Kvíz dokončen. Gratulace týmu!</span>
-                    <button onClick={() => setShowLog((s)=>!s)} className="w-full px-3 py-2 rounded-xl border">
-                      {showLog ? 'Skrýt log odpovědí' : `Zobrazit log odpovědí (${answersLog.length})`}
-                    </button>
-                    {showLog && (
-                      <div className="max-h-64 overflow-y-auto border rounded-xl p-3 bg-slate-50 text-left">
-                        {answersLog.length === 0 ? (
-                          <div className="text-slate-500">Žádné záznamy.</div>
-                        ) : (
-                          <ul className="space-y-2">
-                            {answersLog.map((e, idx) => (
-                              <li key={e.id || idx} className="text-sm">
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <span className="font-mono">#{(e.qIndex ?? 0) + 1}</span>
-                                    <span className={"ml-2 px-1.5 py-0.5 rounded text-xs " + (e.correct ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700")}>{e.correct ? "správně" : "špatně"}</span>
-                                    <span className="ml-2 text-slate-700">{e.authorNick}</span>
-                                  </div>
-                                  <div className="text-[11px] text-slate-500">{(e.ts?.toDate ? e.ts.toDate() : (e.ts? new Date(e.ts): null))?.toLocaleString?.() || ""}</div>
-                                </div>
-                                {e.correct && e.comment && (
-                                  <div className="mt-1 text-[12px] text-slate-700">Komentář: {e.comment}</div>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <span>Kvíz dokončen. Gratulace týmu!</span>
                 ) : (
                   <span>Špatná odpověď kohokoliv spouští 10s pauzu pro všechny. Vyřešeno {solvedCount}/{totalCount}.</span>
                 )}

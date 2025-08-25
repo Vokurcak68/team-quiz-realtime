@@ -9,7 +9,7 @@
                 "Plzeň"
             ],
             "answer": 1,
-            "explanation": "Ústavní soud sídlí v Brně."
+            "comment": "Router provádí směrování mezi sítěmi (L3)."
         }
     ]
 }
