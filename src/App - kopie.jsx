@@ -18,19 +18,6 @@ const firebaseConfigDefaults = {
   appId: "REPLACE_ME",
 };
 
-// --- TRVALÁ KONFIGURACE ZE SOUBORU / KÓDU ---
-// 1) Preferuje se soubor /firebase.config.json (veřejný, JSON ve stejném tvaru)
-// 2) Pokud soubor není, použije se tato statická konstanta (vyplňte jednou a hráči už nic neřeší)
-const STATIC_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDDzIg_K4HT0GSYZR8X_Drhxg9r066jiNk",
-  authDomain: "kviz-a3c45.firebaseapp.com",
-  projectId: "kviz-a3c45",
-  storageBucket: "kviz-a3c45.appspot.com",
-  messagingSenderId: "42428150893",
-  appId: "1:42428150893:web:7af0d07dd45eaff935fb64",
-  // measurementId je volitelný
-};
-
 // --- Firebase přes CDN (bez npm) ---
 const FIREBASE_JS_VER = "10.12.2"; // případně aktualizujte
 let _fs = null; // modul firestore
@@ -40,10 +27,10 @@ let _initialized = false;
 async function getFS(activeConfig) {
   if (_fs && _db && _initialized) return { fs: _fs, db: _db };
   const { initializeApp } = await import(
-    `https://www.gstatic.com/firebasejs/${FIREBASE_JS_VER}/firebase-app.js`
+      /* @vite-ignore */ `https://www.gstatic.com/firebasejs/${FIREBASE_JS_VER}/firebase-app.js`
   );
   const fs = await import(
-    `https://www.gstatic.com/firebasejs/${FIREBASE_JS_VER}/firebase-firestore.js`
+      /* @vite-ignore */ `https://www.gstatic.com/firebasejs/${FIREBASE_JS_VER}/firebase-firestore.js`
   );
   const app = initializeApp(activeConfig);
   const db = fs.getFirestore(app);
@@ -98,8 +85,14 @@ function clearSavedQuestions() {
 }
 
 function isConfigReady(cfg) {
-  if (!cfg) return false;
-  const vals = [cfg.apiKey, cfg.authDomain, cfg.projectId, cfg.storageBucket, cfg.messagingSenderId, cfg.appId];
+  const vals = [
+    cfg.apiKey,
+    cfg.authDomain,
+    cfg.projectId,
+    cfg.storageBucket,
+    cfg.messagingSenderId,
+    cfg.appId,
+  ];
   return vals.every((v) => typeof v === "string" && v.trim().length > 0 && !v.includes("REPLACE_ME"));
 }
 
@@ -163,29 +156,7 @@ export default function TeamQuizRealtime() {
 
   // Firebase config (editovatelný přímo v UI)
   const [firebaseCfg, setFirebaseCfg] = useState(() => ({ ...firebaseConfigDefaults, ...loadSavedConfig() }));
-  const [fileConfig, setFileConfig] = useState(null);
-
-  // Načti /firebase.config.json pokud existuje (před UI/LS)
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/firebase.config.json", { cache: "no-store" });
-        if (res.ok) {
-          const json = await res.json();
-          if (isConfigReady(json)) setFileConfig(json);
-        }
-      } catch (_) {}
-    })();
-  }, []);
-
-  const cfgLockedByFile = isConfigReady(fileConfig);
-  const cfgLockedByStatic = !cfgLockedByFile && isConfigReady(STATIC_FIREBASE_CONFIG);
-  const activeConfig = useMemo(() => {
-    if (cfgLockedByFile) return fileConfig;
-    if (cfgLockedByStatic) return STATIC_FIREBASE_CONFIG;
-    return firebaseCfg;
-  }, [cfgLockedByFile, cfgLockedByStatic, fileConfig, firebaseCfg]);
-  const configReady = useMemo(() => isConfigReady(activeConfig), [activeConfig]);
+  const configReady = useMemo(() => isConfigReady(firebaseCfg), [firebaseCfg]);
 
   // Stavy hry
   const [stage, setStage] = useState("intro"); // intro | lobby | game
@@ -283,7 +254,7 @@ const unsubChatRef = useRef(null);
       return;
     }
 
-    const { fs, db } = await getFS(activeConfig);
+    const { fs, db } = await getFS(firebaseCfg);
 
     const code = normalizeRoom(roomCode);
     const nickname = nick.trim().slice(0, 24) || "Player";
@@ -360,7 +331,7 @@ const unsubChatRef = useRef(null);
 
   // Publikuj sadu otázek do místnosti (jednou), poté start
   async function startGame() {
-    const { fs, db } = await getFS(activeConfig);
+    const { fs, db } = await getFS(firebaseCfg);
     if (!room) return;
 
     const roomRef = fs.doc(db, "rooms", room.id);
@@ -383,7 +354,7 @@ const unsubChatRef = useRef(null);
     try {
       const text = (chatInput || "").trim();
       if (!text || !room?.id) return;
-      const { fs, db } = await getFS(activeConfig);
+      const { fs, db } = await getFS(firebaseCfg);
       await fs.addDoc(
         fs.collection(db, "rooms", room.id, "chat"),
         { text, authorId: myId, authorNick: nick, ts: fs.serverTimestamp() }
@@ -504,16 +475,32 @@ const unsubChatRef = useRef(null);
               </div>
               {!configReady && (
                 <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mt-2">
-                  Zadejte Firebase config (nebo použijte soubor <code>firebase.config.json</code> či statický blok v kódu). Uloží se do prohlížeče.
-                </p>
-              )}
-              {(cfgLockedByFile || cfgLockedByStatic) && (
-                <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 mt-2">
-                  Konfigurace je načtena {cfgLockedByFile ? 'ze souboru /firebase.config.json' : 'ze statického bloku v kódu'} a UI je pouze informativní.
+                  Zadejte svůj Firebase config (Config → SDK setup and configuration → Config). Uloží se do prohlížeče.
                 </p>
               )}
               {showCfg && (
-                <div className="grid sm:grid-cols-2 gap-3 mt-3">$1</div>
+                <div className="grid sm:grid-cols-2 gap-3 mt-3">
+                  <input className="border rounded-xl px-3 py-2" placeholder="apiKey" value={firebaseCfg.apiKey}
+                    onChange={(e) => saveFirebaseCfg({ apiKey: e.target.value })} />
+                  <input className="border rounded-xl px-3 py-2" placeholder="authDomain" value={firebaseCfg.authDomain}
+                    onChange={(e) => saveFirebaseCfg({ authDomain: e.target.value })} />
+                  <input className="border rounded-xl px-3 py-2" placeholder="projectId" value={firebaseCfg.projectId}
+                    onChange={(e) => saveFirebaseCfg({ projectId: e.target.value })} />
+                  <input className="border rounded-xl px-3 py-2" placeholder="storageBucket" value={firebaseCfg.storageBucket}
+                    onChange={(e) => saveFirebaseCfg({ storageBucket: e.target.value })} />
+                  <input className="border rounded-xl px-3 py-2" placeholder="messagingSenderId" value={firebaseCfg.messagingSenderId}
+                    onChange={(e) => saveFirebaseCfg({ messagingSenderId: e.target.value })} />
+                  <input className="border rounded-xl px-3 py-2" placeholder="appId" value={firebaseCfg.appId}
+                    onChange={(e) => saveFirebaseCfg({ appId: e.target.value })} />
+                  <div className="sm:col-span-2 flex gap-2">
+                    <button onClick={() => setFirebaseCfg({ ...firebaseCfg })} className="px-4 py-2 rounded-xl bg-slate-900 text-white">
+                      Uložit / aktualizovat
+                    </button>
+                    <button onClick={() => { resetFirebaseCfg(); }} className="px-4 py-2 rounded-xl bg-slate-200">
+                      Vymazat nastavení
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
 
@@ -673,7 +660,7 @@ const unsubChatRef = useRef(null);
                         onClick={() => {
                           (async () => {
                             if (!configReady || allSolved) return;
-                            const { fs, db } = await getFS(activeConfig);
+                            const { fs, db } = await getFS(firebaseCfg);
                             const rRef = fs.doc(db, "rooms", normalizeRoom(roomCode));
 
                             // Pokud už je otázka vyřešena (race), jen zavřít
@@ -699,7 +686,7 @@ const unsubChatRef = useRef(null);
                                   const startMs = data.lockedAt?.toMillis ? data.lockedAt.toMillis() : data.lockedAt || 0;
                                   const active = startMs && now < startMs + PENALTY_MS;
                                   if (active) return;
-                                  tx.update(rRef, { lockedAt: (await getFS(activeConfig)).fs.serverTimestamp(), lockedBy: nick });
+                                  tx.update(rRef, { lockedAt: (await getFS(firebaseCfg)).fs.serverTimestamp(), lockedBy: nick });
                                 });
                               } catch (e) { console.error("Lock TX failed", e); }
                             }
