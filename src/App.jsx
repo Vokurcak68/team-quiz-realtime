@@ -56,7 +56,7 @@ async function getFS(activeConfig) {
 }
 
 // === Utility ===
-const PENALTY_MS = 10_000; // 10s globální zámek
+const DEFAULT_PENALTY_MS = 10_000; // výchozí 10s globální zámek
 const LS_FB = "tqr:fbconfig";
 const LS_QS = "tqr:questions"; // uložená lokální sada (z importu)
 
@@ -169,11 +169,26 @@ export default function TeamQuizRealtime() {
   const configReady = useMemo(() => isConfigReady(activeConfig), [activeConfig]);
 
   // Stavy hry
-  const [stage, setStage] = useState("intro"); // intro | lobby | game
+  const [stage, setStage] = useState("intro"); // intro | lobby | game | admin
   const [room, setRoom] = useState(null); // dokument místnosti
   const [players, setPlayers] = useState([]); // seznam hráčů z Firestore
   const [localQuestions, setLocalQuestions] = useState(null); // lokální sada (fallback nebo import)
   const [loading, setLoading] = useState(false);
+  
+  // Admin sekce
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [allRooms, setAllRooms] = useState([]);
+  const [questionSets, setQuestionSets] = useState({}); // { setId: { name, questions: [...] } }
+  const [newSetName, setNewSetName] = useState("");
+  const [selectedSetForRoom, setSelectedSetForRoom] = useState({});
+  const [newRoomCode, setNewRoomCode] = useState("");
+  const [newRoomSetId, setNewRoomSetId] = useState("");
+  const [newRoomMessage, setNewRoomMessage] = useState("");
+  const [newRoomPenalty, setNewRoomPenalty] = useState("");
+  const [roomMessages, setRoomMessages] = useState({});
+  const [roomPenalties, setRoomPenalties] = useState({});
 
   // UI / volby
   const [selectedIndex, setSelectedIndex] = useState(null);
@@ -181,8 +196,10 @@ export default function TeamQuizRealtime() {
   const [showCfg, setShowCfg] = useState(false);
   const [fileInfo, setFileInfo] = useState("");
   const [showOnlyUnsolved, setShowOnlyUnsolved] = useState(false);
-  const [openInWindow, setOpenInWindow] = useState(true);
+  const [displayMode, setDisplayMode] = useState("overlay"); // "popup", "overlay", "inline"
   const [jumpTo, setJumpTo] = useState("");
+  const [overlayQuestion, setOverlayQuestion] = useState(null);
+  const [overlayResult, setOverlayResult] = useState(null); // null, 'correct', 'wrong'
   const [flash, setFlash] = useState(null);
 
   // Chat / log
@@ -217,20 +234,27 @@ export default function TeamQuizRealtime() {
     });
     return () => { active = false; };
   }, []);
+  
+  // Načti sady otázek z Firebase při startu
+  useEffect(() => {
+    if (!configReady) return;
+    loadQuestionSetsFromFirebase();
+  }, [configReady, activeConfig]);
 
   // Sleduj globální zámek a počítej odpočet
   useEffect(() => {
     if (!room?.lockedAt) { setLockRemaining(0); return; }
     const tick = () => {
       const startMs = room.lockedAt?.toMillis ? room.lockedAt.toMillis() : room.lockedAt;
-      const rem = Math.max(0, Math.ceil((startMs + PENALTY_MS - Date.now()) / 1000));
+      const penaltyMs = (room.penaltySeconds || 10) * 1000;
+      const rem = Math.max(0, Math.ceil((startMs + penaltyMs - Date.now()) / 1000));
       setLockRemaining(rem);
     };
     tick();
     clearInterval(lockTimerRef.current);
     lockTimerRef.current = setInterval(tick, 250);
     return () => clearInterval(lockTimerRef.current);
-  }, [room?.lockedAt]);
+  }, [room?.lockedAt, room?.penaltySeconds]);
 
   // Jakmile kdokoliv ve stejné místnosti spustí hru, automaticky přepni všechny do GAME
   useEffect(() => { if (room?.started && stage !== "game") setStage("game"); }, [room?.started, stage]);
@@ -239,8 +263,12 @@ export default function TeamQuizRealtime() {
   const effectiveQuestions = useMemo(() => {
     const shared = room?.bank?.items;
     if (Array.isArray(shared) && shared.length) return shared;
+    // Pokud místnost má přiřazenou sadu, použij ji
+    if (room?.questionSetId && questionSets[room.questionSetId]) {
+      return questionSets[room.questionSetId].questions || [];
+    }
     return localQuestions || [];
-  }, [room?.bank?.items, localQuestions]);
+  }, [room?.bank?.items, room?.questionSetId, questionSets, localQuestions]);
 
   // drž vždy aktuální sadu pro handler v popupu
   useEffect(() => { effectiveQuestionsRef.current = effectiveQuestions; }, [effectiveQuestions]);
@@ -265,6 +293,37 @@ export default function TeamQuizRealtime() {
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
   }, [room?.id, myId, nick]); // neodkazuj na effectiveQuestions – čteme z refu
+  
+  // Klávesové ovládání pro overlay
+  useEffect(() => {
+    function handleKeyPress(e) {
+      if (overlayQuestion === null) return;
+      
+      if (e.key === 'Escape') {
+        setOverlayQuestion(null);
+        setOverlayResult(null);
+        return;
+      }
+      
+      // Čísla 1-9 nebo písmena A-I pro odpovědi
+      const question = effectiveQuestions[overlayQuestion];
+      if (!question || lockRemaining > 0) return;
+      
+      let answerIndex = -1;
+      if (e.key >= '1' && e.key <= '9') {
+        answerIndex = parseInt(e.key) - 1;
+      } else if (e.key.toUpperCase() >= 'A' && e.key.toUpperCase() <= 'I') {
+        answerIndex = e.key.toUpperCase().charCodeAt(0) - 65;
+      }
+      
+      if (answerIndex >= 0 && answerIndex < question.options.length) {
+        submitAnswerOverlay(overlayQuestion, answerIndex);
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [overlayQuestion, effectiveQuestions, lockRemaining]);
 
   async function submitAnswerFromPopup(qIndex, choice, popwin) {
     try {
@@ -286,9 +345,11 @@ export default function TeamQuizRealtime() {
         try {
           await fs.runTransaction(db, async (tx) => {
             const snap = await tx.get(rRef);
+            const roomData = snap.data();
             const now = Date.now();
-            const lockedAt = snap.data()?.lockedAt;
-            const stillLocked = lockedAt && (lockedAt.toMillis ? (lockedAt.toMillis() + PENALTY_MS > now) : (lockedAt + PENALTY_MS > now));
+            const lockedAt = roomData?.lockedAt;
+            const penaltyMs = (roomData?.penaltySeconds || 10) * 1000;
+            const stillLocked = lockedAt && (lockedAt.toMillis ? (lockedAt.toMillis() + penaltyMs > now) : (lockedAt + penaltyMs > now));
             if (!stillLocked) tx.update(rRef, { lockedAt: (await getFS(activeConfig)).fs.serverTimestamp(), lockedBy: nick });
           });
         } catch (e) { console.error("Lock TX failed", e); }
@@ -303,6 +364,26 @@ export default function TeamQuizRealtime() {
 
   async function submitAnswerInline(qIndex, choice) {
     return submitAnswerFromPopup(qIndex, choice, null);
+  }
+  
+  async function submitAnswerOverlay(qIndex, choice) {
+    if (!effectiveQuestionsRef.current?.[qIndex] || !room?.id) return;
+    
+    const correct = choice === (effectiveQuestionsRef.current[qIndex]?.answer);
+    
+    // Nastav výsledek pro zobrazení v overlay
+    setOverlayResult(correct ? 'correct' : 'wrong');
+    
+    // Proveď standardní submit
+    await submitAnswerFromPopup(qIndex, choice, null);
+    
+    // Pokud je správně, zavři po chvíli
+    if (correct) {
+      setTimeout(() => {
+        setOverlayQuestion(null);
+        setOverlayResult(null);
+      }, 1500);
+    }
   }
 
   // Fanfára – přehraj krátkou sekvenci tónů (bez externích souborů)
@@ -389,7 +470,10 @@ export default function TeamQuizRealtime() {
       const roomRef = fs.doc(db, "rooms", code);
       const snap = await fs.getDoc(roomRef);
       if (!snap.exists()) {
-        await fs.setDoc(roomRef, { createdAt: fs.serverTimestamp(), started: false, lockedAt: null, lockedBy: "", bank: null, solved: {} });
+        // Pokud místnost neexistuje, nevytváříme ji automaticky
+        alert(`Místnost ${code} neexistuje. Požádejte administrátora o její vytvoření.`);
+        setLoading(false);
+        return;
       }
       const playerRef = fs.doc(db, "rooms", code, "players", myId);
       await fs.setDoc(playerRef, { nickname, score: 0, joinedAt: fs.serverTimestamp(), lastSeen: fs.serverTimestamp() }, { merge: true });
@@ -416,6 +500,9 @@ export default function TeamQuizRealtime() {
         fs.query(fs.collection(db, "rooms", code, "answers"), fs.orderBy("ts", "asc"), fs.limit(1000)),
         (qs) => { const arr = []; qs.forEach((x) => arr.push({ id: x.id, ...x.data() })); setAnswersLog(arr); }
       );
+      
+      // Načti sady otázek z Firebase
+      await loadQuestionSetsFromFirebase();
 
       setStage("lobby");
       const presence = setInterval(() => fs.updateDoc(playerRef, { lastSeen: fs.serverTimestamp() }).catch(() => {}), 5000);
@@ -423,13 +510,28 @@ export default function TeamQuizRealtime() {
     } catch (e) { alert("Chyba připojení: " + e.message); } finally { setLoading(false); }
   }
 
-  // Publikuj sadu otázek do místnosti (vždy override), poté start
+  // Publikuj sadu otázek do místnosti (používá přiřazenou sadu), poté start
   async function startGame() {
     const { fs, db } = await getFS(activeConfig);
     if (!room) return;
     const roomRef = fs.doc(db, "rooms", room.id);
     try {
-      const toPublish = Array.isArray(localQuestions) && localQuestions.length ? localQuestions : FALLBACK_QUESTIONS;
+      let toPublish = [];
+      
+      // Pokud místnost má přiřazenou sadu, načti ji z Firebase
+      if (room.questionSetId) {
+        const setDoc = await fs.getDoc(fs.doc(db, "questionSets", room.questionSetId));
+        if (setDoc.exists()) {
+          const setData = setDoc.data();
+          toPublish = setData.questions || [];
+        }
+      }
+      
+      // Fallback na lokální otázky
+      if (!toPublish.length) {
+        toPublish = Array.isArray(localQuestions) && localQuestions.length ? localQuestions : FALLBACK_QUESTIONS;
+      }
+      
       await fs.updateDoc(roomRef, { bank: { items: toPublish }, solved: {} });
       await fs.updateDoc(roomRef, { started: true });
       setStage("game");
@@ -456,6 +558,205 @@ export default function TeamQuizRealtime() {
   }
 
   const canStart = players.length >= 2 && !room?.started;
+  
+  // Admin funkce
+  async function handleAdminLogin() {
+    if (adminPassword === "8288") {
+      setIsAdmin(true);
+      setShowAdminLogin(false);
+      setAdminPassword("");
+      setStage("admin");
+      await loadAllRooms();
+    } else {
+      alert("Nesprávné heslo");
+      setAdminPassword("");
+    }
+  }
+  
+  async function loadAllRooms() {
+    if (!configReady) return;
+    try {
+      const { fs, db } = await getFS(activeConfig);
+      const roomsQuery = fs.query(fs.collection(db, "rooms"));
+      const snapshot = await fs.getDocs(roomsQuery);
+      const rooms = [];
+      snapshot.forEach(doc => {
+        rooms.push({ id: doc.id, ...doc.data() });
+      });
+      setAllRooms(rooms);
+      
+      // Načti také sady otázek
+      await loadQuestionSetsFromFirebase();
+    } catch (e) {
+      alert("Chyba při načítání místností: " + e.message);
+    }
+  }
+  
+  async function loadQuestionSetsFromFirebase() {
+    if (!configReady) return;
+    try {
+      const { fs, db } = await getFS(activeConfig);
+      const setsSnapshot = await fs.getDocs(fs.collection(db, "questionSets"));
+      const sets = {};
+      setsSnapshot.forEach(doc => {
+        sets[doc.id] = doc.data();
+      });
+      setQuestionSets(sets);
+    } catch (e) {
+      console.error("Chyba při načítání sad otázek:", e);
+    }
+  }
+  
+  async function deleteRoom(roomId) {
+    if (!confirm(`Opravdu chcete smazat místnost ${roomId} včetně všech dat?`)) return;
+    try {
+      const { fs, db } = await getFS(activeConfig);
+      
+      // Smaž všechny hráče
+      const playersQuery = fs.query(fs.collection(db, "rooms", roomId, "players"));
+      const playersSnapshot = await fs.getDocs(playersQuery);
+      for (const doc of playersSnapshot.docs) {
+        await fs.deleteDoc(doc.ref);
+      }
+      
+      // Smaž všechny chat zprávy
+      const chatQuery = fs.query(fs.collection(db, "rooms", roomId, "chat"));
+      const chatSnapshot = await fs.getDocs(chatQuery);
+      for (const doc of chatSnapshot.docs) {
+        await fs.deleteDoc(doc.ref);
+      }
+      
+      // Smaž všechny odpovědi
+      const answersQuery = fs.query(fs.collection(db, "rooms", roomId, "answers"));
+      const answersSnapshot = await fs.getDocs(answersQuery);
+      for (const doc of answersSnapshot.docs) {
+        await fs.deleteDoc(doc.ref);
+      }
+      
+      // Smaž samotnou místnost
+      await fs.deleteDoc(fs.doc(db, "rooms", roomId));
+      
+      alert(`Místnost ${roomId} byla úspěšně smazána`);
+      await loadAllRooms();
+    } catch (e) {
+      alert("Chyba při mazání místnosti: " + e.message);
+    }
+  }
+  
+  async function assignSetToRoom(roomId, setId) {
+    if (!setId) return;
+    try {
+      const { fs, db } = await getFS(activeConfig);
+      const updates = { questionSetId: setId };
+      
+      // Pokud je zadána nová hláška pro tuto místnost, ulož ji také
+      if (roomMessages[roomId] !== undefined) {
+        updates.completionMessage = roomMessages[roomId].trim() || "Kód Vaší mise je 2289";
+      }
+      
+      // Pokud je zadána nová penalizace pro tuto místnost, ulož ji také
+      if (roomPenalties[roomId] !== undefined) {
+        updates.penaltySeconds = parseInt(roomPenalties[roomId]) || 10;
+      }
+      
+      await fs.updateDoc(fs.doc(db, "rooms", roomId), updates);
+      setSelectedSetForRoom({ ...selectedSetForRoom, [roomId]: setId });
+      alert(`Sada a nastavení byly přiřazeny místnosti ${roomId}`);
+      await loadAllRooms();
+    } catch (e) {
+      alert("Chyba při přiřazení sady: " + e.message);
+    }
+  }
+  
+  async function addQuestionSet() {
+    if (!newSetName.trim()) return;
+    if (!localQuestions?.length) {
+      alert("Nejprve nahrajte JSON s otázkami");
+      return;
+    }
+    
+    try {
+      const { fs, db } = await getFS(activeConfig);
+      const setId = uid();
+      const newSet = {
+        name: newSetName.trim(),
+        questions: localQuestions,
+        createdAt: fs.serverTimestamp()
+      };
+      
+      // Ulož do Firebase
+      await fs.setDoc(fs.doc(db, "questionSets", setId), newSet);
+      
+      // Aktualizuj lokální stav
+      setQuestionSets({ ...questionSets, [setId]: newSet });
+      setNewSetName("");
+      setFileInfo(`Sada "${newSet.name}" byla přidána`);
+    } catch (e) {
+      alert("Chyba při ukládání sady: " + e.message);
+    }
+  }
+  
+  async function deleteQuestionSet(setId) {
+    if (!confirm(`Opravdu chcete smazat tuto sadu otázek?`)) return;
+    
+    try {
+      const { fs, db } = await getFS(activeConfig);
+      await fs.deleteDoc(fs.doc(db, "questionSets", setId));
+      
+      // Aktualizuj lokální stav
+      const newSets = { ...questionSets };
+      delete newSets[setId];
+      setQuestionSets(newSets);
+    } catch (e) {
+      alert("Chyba při mazání sady: " + e.message);
+    }
+  }
+  
+  async function createRoom() {
+    if (!newRoomCode.trim()) {
+      alert("Zadejte kód místnosti");
+      return;
+    }
+    if (!newRoomSetId) {
+      alert("Vyberte sadu otázek");
+      return;
+    }
+    
+    try {
+      const { fs, db } = await getFS(activeConfig);
+      const code = normalizeRoom(newRoomCode);
+      const roomRef = fs.doc(db, "rooms", code);
+      
+      // Kontrola, zda místnost již existuje
+      const snap = await fs.getDoc(roomRef);
+      if (snap.exists()) {
+        alert(`Místnost ${code} již existuje`);
+        return;
+      }
+      
+      // Vytvoření nové místnosti s přiřazenou sadou, hláškou a penalizací
+      await fs.setDoc(roomRef, {
+        createdAt: fs.serverTimestamp(),
+        started: false,
+        lockedAt: null,
+        lockedBy: "",
+        bank: null,
+        solved: {},
+        questionSetId: newRoomSetId,
+        completionMessage: newRoomMessage.trim() || "Kód Vaší mise je 2289",
+        penaltySeconds: parseInt(newRoomPenalty) || 10
+      });
+      
+      alert(`Místnost ${code} byla vytvořena se sadou otázek`);
+      setNewRoomCode("");
+      setNewRoomSetId("");
+      setNewRoomMessage("");
+      setNewRoomPenalty("");
+      await loadAllRooms();
+    } catch (e) {
+      alert("Chyba při vytváření místnosti: " + e.message);
+    }
+  }
 
   // === UI ===
   return (
@@ -477,7 +778,7 @@ export default function TeamQuizRealtime() {
           )}
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold">Síťový týmový kvíz</h1>
-            <p className="text-slate-600 text-sm">Týmový režim • kvíz končí po vyřešení všech otázek • špatná odpověď = 10s pauza</p>
+            <p className="text-slate-600 text-sm">Týmový režim • kvíz končí po vyřešení všech otázek • špatná odpověď = penalizace</p>
           </div>
           {room && (
             <div className="text-right text-sm">
@@ -492,57 +793,41 @@ export default function TeamQuizRealtime() {
             <div className="grid gap-2">
               <label className="text-sm text-slate-600">Kód místnosti (A–Z, 0–9):</label>
               <input value={roomCode} onChange={(e) => setRoomCode(e.target.value.toUpperCase())} className="border rounded-xl px-4 py-3 bg-white text-slate-900 placeholder-slate-400 [color-scheme:light]" placeholder="Např. DEVOPS" />
+              <div className="text-xs text-amber-600">⚠️ Místnosti musí být vytvořeny administrátorem pro správné přiřazení sady otázek</div>
             </div>
             <div className="grid gap-2">
               <label className="text-sm text-slate-600">Váš nickname:</label>
               <input value={nick} onChange={(e) => setNick(e.target.value)} className="border rounded-xl px-4 py-3 bg-white text-slate-900 placeholder-slate-400 [color-scheme:light]" placeholder="Např. AnsibleKing" />
             </div>
 
-            {/* Import JSON se sadou otázek */}
-            <div className="border rounded-2xl p-4 bg-slate-50">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Import otázek (JSON)</h3>
-                <span className="text-xs text-slate-500">{fileInfo}</span>
-              </div>
-              <div className="mt-3 flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-                <input type="file" accept="application/json" onChange={async (e) => {
-                  const f = e.target.files?.[0]; if (!f) return;
-                  try { const qs = await loadQuestionBankFromFile(f); setLocalQuestions(qs); saveQuestionsToLS(qs); setFileInfo(`Soubor: ${f.name} • ${qs.length} otázek`); }
-                  catch (err) { alert(String(err?.message || err)); }
-                }} />
-                <button className="px-3 py-2 rounded-xl bg-slate-100 border" onClick={() => { clearSavedQuestions(); setFileInfo("Vymazáno"); }}>Vymazat uloženou sadu</button>
-              </div>
-            </div>
 
-            {/* Nastavení Firebase */}
-            <div className="border rounded-2xl p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Nastavení Firebase</h3>
-                {(cfgLockedByFile || cfgLockedByStatic) && (
-                  <span className="text-xs text-slate-500">Konfigurace je uzamčena souborem nebo staticky v kódu.</span>
-                )}
-              </div>
-              {!cfgLockedByFile && !cfgLockedByStatic && (
-                <div className="grid sm:grid-cols-2 gap-3 mt-3">
-                  {Object.entries(firebaseCfg).map(([k, v]) => (
-                    <input key={k} value={v} onChange={(e) => saveFirebaseCfg({ [k]: e.target.value })} className="border rounded-xl px-3 py-2 bg-white text-slate-900 placeholder-slate-400 [color-scheme:light]" placeholder={k} />
-                  ))}
-                </div>
-              )}
-              <div className="mt-3 flex gap-3">
-                <button className="px-3 py-2 rounded-xl bg-slate-100 border" onClick={() => setShowCfg((s) => !s)}>{showCfg ? "Skrýt JSON" : "Zobrazit JSON"}</button>
-                {!cfgLockedByFile && !cfgLockedByStatic && (
-                  <button className="px-3 py-2 rounded-xl bg-rose-50 border border-rose-200" onClick={resetFirebaseCfg}>Resetovat pole</button>
-                )}
-              </div>
-              {showCfg && (
-                <pre className="mt-3 text-xs bg-slate-50 p-3 rounded-xl overflow-auto">{JSON.stringify(activeConfig, null, 2)}</pre>
-              )}
-            </div>
 
-            <div className="flex gap-3 justify-end">
+            <div className="flex gap-3 justify-between">
+              <button onClick={() => setShowAdminLogin(true)} className="px-4 py-3 rounded-2xl bg-amber-600 hover:bg-amber-500 text-white">Admin</button>
               <button disabled={!configReady || !roomCode || !nick || loading} onClick={joinRoom} className={classNames("px-4 py-3 rounded-2xl text-white", (!configReady || !roomCode || !nick || loading) ? "bg-slate-400" : "bg-slate-900 hover:bg-slate-800")}>{loading ? "Připojuji…" : "Připojit"}</button>
             </div>
+            
+            {/* Admin login modal */}
+            {showAdminLogin && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-2xl p-6 max-w-sm w-[90%]">
+                  <h3 className="text-lg font-semibold mb-4">Admin přihlášení</h3>
+                  <input 
+                    type="password" 
+                    value={adminPassword} 
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAdminLogin()}
+                    className="w-full border rounded-xl px-3 py-2 mb-4"
+                    placeholder="Zadejte heslo"
+                    autoFocus
+                  />
+                  <div className="flex gap-3 justify-end">
+                    <button onClick={() => { setShowAdminLogin(false); setAdminPassword(""); }} className="px-4 py-2 rounded-xl bg-slate-200">Zrušit</button>
+                    <button onClick={handleAdminLogin} className="px-4 py-2 rounded-xl bg-amber-600 text-white">Přihlásit</button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -555,7 +840,13 @@ export default function TeamQuizRealtime() {
                   <span key={p.id} className="px-3 py-1 rounded-full bg-slate-100 border">{p.nickname}</span>
                 ))}
               </div>
-              <div className="mt-3 text-sm text-slate-600">Sada k publikaci: <strong>{(Array.isArray(localQuestions) && localQuestions.length ? localQuestions.length : FALLBACK_QUESTIONS.length)}</strong> otázek</div>
+              <div className="mt-3 text-sm text-slate-600">
+                {room?.questionSetId && questionSets[room.questionSetId] ? (
+                  <>Přiřazená sada: <strong>{questionSets[room.questionSetId].name}</strong> ({questionSets[room.questionSetId].questions?.length} otázek)</>
+                ) : (
+                  <>Sada k publikaci: <strong>{(Array.isArray(localQuestions) && localQuestions.length ? localQuestions.length : FALLBACK_QUESTIONS.length)}</strong> otázek</>
+                )}
+              </div>
               <div className="mt-4 flex items-center gap-3">
                 <button disabled={!canStart} onClick={startGame} className={classNames("px-4 py-2 rounded-2xl text-white", canStart ? "bg-emerald-600 hover:bg-emerald-500" : "bg-slate-400")}>Start</button>
                 {!canStart && <span className="text-sm text-slate-500">Potřeba alespoň 2 hráči a nezahájená hra.</span>}
@@ -584,10 +875,18 @@ export default function TeamQuizRealtime() {
                   <input type="checkbox" className="accent-slate-900" checked={showOnlyUnsolved} onChange={(e) => setShowOnlyUnsolved(e.target.checked)} />
                   Jen nevyřešené
                 </label>
-                <label className="inline-flex items-center gap-2">
-                  <input type="checkbox" className="accent-slate-900" checked={openInWindow} onChange={(e) => setOpenInWindow(e.target.checked)} />
-                  Otevírat v novém okně
-                </label>
+                <div className="flex items-center gap-4">
+                  <label className="text-sm text-slate-600">Režim zobrazení otázek:</label>
+                  <select 
+                    value={displayMode} 
+                    onChange={(e) => setDisplayMode(e.target.value)}
+                    className="border rounded-lg px-2 py-1 text-sm"
+                  >
+                    <option value="popup">Nové okno (popup)</option>
+                    <option value="overlay">Přes celou obrazovku</option>
+                    <option value="inline">V hlavním okně</option>
+                  </select>
+                </div>
                 <div className="ml-auto flex items-center gap-2 text-sm">
                   <span>Skok na #</span>
                   <input value={jumpTo} onChange={(e) => setJumpTo(e.target.value)} className="border rounded-lg px-2 py-1 w-20 bg-white text-slate-900 placeholder-slate-400 [color-scheme:light]" />
@@ -614,15 +913,23 @@ export default function TeamQuizRealtime() {
                         done ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-white border-slate-200 hover:bg-slate-50",
                         lockRemaining > 0 && "opacity-60 cursor-not-allowed"
                       )}
-                      onClick={() => (openInWindow ? openQuestionPopup(i) : setSelectedIndex(i))}
+                      onClick={() => {
+                        if (displayMode === "popup") {
+                          openQuestionPopup(i);
+                        } else if (displayMode === "overlay") {
+                          setOverlayQuestion(i);
+                        } else {
+                          setSelectedIndex(i);
+                        }
+                      }}
                       title={q.q}
                     >{i + 1}</button>
                   );
                 })}
               </div>
 
-              {/* Inline panel otázek (když není popup) */}
-              {!openInWindow && selectedIndex != null && effectiveQuestions[selectedIndex] && (
+              {/* Inline panel otázek (když je inline režim) */}
+              {displayMode === "inline" && selectedIndex != null && effectiveQuestions[selectedIndex] && (
                 <div className="mt-5 border rounded-2xl p-4">
                   <div className="text-sm text-slate-500 mb-1">Otázka #{selectedIndex + 1}</div>
                   <div className="font-medium mb-3">{effectiveQuestions[selectedIndex].q}</div>
@@ -642,7 +949,9 @@ export default function TeamQuizRealtime() {
               <div className="mt-5 text-sm text-slate-600">
                 Vyřešeno: <strong>{solvedCount}/{totalCount}</strong>
                 {allSolved && (
-                  <div className="mission-banner mt-3 w-full text-center text-2xl sm:text-4xl font-extrabold tracking-wide text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3">Kód Vaší mise je 2289</div>
+                  <div className="mission-banner mt-3 w-full text-center text-2xl sm:text-4xl font-extrabold tracking-wide text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3">
+                    {room?.completionMessage || "Kód Vaší mise je 2289"}
+                  </div>
                 )}
               </div>
             </div>
@@ -676,6 +985,350 @@ export default function TeamQuizRealtime() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {stage === "admin" && (
+          <div className="bg-white rounded-2xl shadow p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">Admin sekce</h2>
+              <button onClick={() => setStage("intro")} className="px-4 py-2 rounded-xl bg-slate-200">Zpět</button>
+            </div>
+            
+            {/* Správa sad otázek */}
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold mb-4">Správa sad otázek</h3>
+              
+              {/* Přidání nové sady */}
+              <div className="border rounded-xl p-4 mb-4 bg-slate-50">
+                <div className="mb-3">
+                  <label className="text-sm text-slate-600">Importovat otázky do nové sady:</label>
+                  <input type="file" accept="application/json" onChange={async (e) => {
+                    const f = e.target.files?.[0]; if (!f) return;
+                    try { 
+                      const qs = await loadQuestionBankFromFile(f); 
+                      setLocalQuestions(qs); 
+                      setFileInfo(`Načteno: ${f.name} • ${qs.length} otázek`); 
+                    }
+                    catch (err) { alert(String(err?.message || err)); }
+                  }} className="mt-2" />
+                </div>
+                
+                <div className="flex gap-3">
+                  <input 
+                    value={newSetName}
+                    onChange={(e) => setNewSetName(e.target.value)}
+                    className="flex-1 border rounded-xl px-3 py-2"
+                    placeholder="Název nové sady"
+                  />
+                  <button 
+                    onClick={addQuestionSet}
+                    disabled={!newSetName.trim() || !localQuestions?.length}
+                    className={classNames("px-4 py-2 rounded-xl text-white", 
+                      (!newSetName.trim() || !localQuestions?.length) ? "bg-slate-400" : "bg-emerald-600 hover:bg-emerald-500")}
+                  >
+                    Přidat sadu
+                  </button>
+                </div>
+                {fileInfo && <div className="text-sm text-slate-500 mt-2">{fileInfo}</div>}
+              </div>
+              
+              {/* Seznam sad */}
+              <div className="space-y-2">
+                {Object.entries(questionSets).map(([setId, setData]) => (
+                  <div key={setId} className="border rounded-xl p-3 flex justify-between items-center">
+                    <div>
+                      <div className="font-medium">{setData.name}</div>
+                      <div className="text-sm text-slate-500">{setData.questions?.length || 0} otázek</div>
+                    </div>
+                    <button 
+                      onClick={() => deleteQuestionSet(setId)}
+                      className="px-3 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700"
+                    >
+                      Smazat
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* Testovací import otázek */}
+            <div className="mb-8">
+              <details className="border rounded-2xl p-4 bg-amber-50">
+                <summary className="cursor-pointer font-semibold">Testovací import otázek (pouze pro ladění)</summary>
+                <div className="mt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-slate-500">{fileInfo}</span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                    <input type="file" accept="application/json" onChange={async (e) => {
+                      const f = e.target.files?.[0]; if (!f) return;
+                      try { const qs = await loadQuestionBankFromFile(f); setLocalQuestions(qs); saveQuestionsToLS(qs); setFileInfo(`Soubor: ${f.name} • ${qs.length} otázek`); }
+                      catch (err) { alert(String(err?.message || err)); }
+                    }} />
+                    <button className="px-3 py-2 rounded-xl bg-slate-100 border" onClick={() => { clearSavedQuestions(); setFileInfo("Vymazáno"); }}>Vymazat uloženou sadu</button>
+                  </div>
+                  <div className="text-xs text-amber-600 mt-2">⚠️ Toto je pouze pro testování - používejte sekci "Správa sad otázek" výše</div>
+                </div>
+              </details>
+            </div>
+            
+            {/* Nastavení Firebase */}
+            <div className="mb-8">
+              <div className="border rounded-2xl p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">Nastavení Firebase</h3>
+                  {(cfgLockedByFile || cfgLockedByStatic) && (
+                    <span className="text-xs text-slate-500">Konfigurace je uzamčena souborem nebo staticky v kódu.</span>
+                  )}
+                </div>
+                {!cfgLockedByFile && !cfgLockedByStatic && (
+                  <div className="grid sm:grid-cols-2 gap-3 mt-3">
+                    {Object.entries(firebaseCfg).map(([k, v]) => (
+                      <input key={k} value={v} onChange={(e) => saveFirebaseCfg({ [k]: e.target.value })} className="border rounded-xl px-3 py-2 bg-white text-slate-900 placeholder-slate-400 [color-scheme:light]" placeholder={k} />
+                    ))}
+                  </div>
+                )}
+                <div className="mt-3 flex gap-3">
+                  <button className="px-3 py-2 rounded-xl bg-slate-100 border" onClick={() => setShowCfg((s) => !s)}>{showCfg ? "Skrýt JSON" : "Zobrazit JSON"}</button>
+                  {!cfgLockedByFile && !cfgLockedByStatic && (
+                    <button className="px-3 py-2 rounded-xl bg-rose-50 border border-rose-200" onClick={resetFirebaseCfg}>Resetovat pole</button>
+                  )}
+                </div>
+                {showCfg && (
+                  <pre className="mt-3 text-xs bg-slate-50 p-3 rounded-xl overflow-auto">{JSON.stringify(activeConfig, null, 2)}</pre>
+                )}
+              </div>
+            </div>
+            
+            {/* Správa místností */}
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Správa místností</h3>
+              
+              {/* Vytvoření nové místnosti */}
+              <div className="border rounded-xl p-4 mb-4 bg-emerald-50">
+                <div className="mb-3">
+                  <label className="text-sm text-slate-600 font-semibold">Vytvořit novou místnost:</label>
+                </div>
+                <div className="grid gap-3">
+                  <div className="flex gap-3">
+                    <input 
+                      value={newRoomCode}
+                      onChange={(e) => setNewRoomCode(e.target.value.toUpperCase())}
+                      className="flex-1 border rounded-xl px-3 py-2"
+                      placeholder="Kód místnosti (např. QUIZ123)"
+                    />
+                    <select 
+                      value={newRoomSetId}
+                      onChange={(e) => setNewRoomSetId(e.target.value)}
+                      className="flex-1 border rounded-xl px-3 py-2"
+                    >
+                      <option value="">-- Vyberte sadu otázek --</option>
+                      {Object.entries(questionSets).map(([setId, setData]) => (
+                        <option key={setId} value={setId}>{setData.name} ({setData.questions?.length} otázek)</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex gap-3">
+                    <input 
+                      value={newRoomMessage}
+                      onChange={(e) => setNewRoomMessage(e.target.value)}
+                      className="flex-1 border rounded-xl px-3 py-2"
+                      placeholder="Hláška po dokončení kvízu (nepovinné)"
+                    />
+                    <input 
+                      type="number"
+                      min="1"
+                      max="300"
+                      value={newRoomPenalty}
+                      onChange={(e) => setNewRoomPenalty(e.target.value)}
+                      className="w-24 border rounded-xl px-3 py-2"
+                      placeholder="10"
+                      title="Penalizace v sekundách za špatnou odpověď"
+                    />
+                    <label className="text-sm text-slate-600 flex items-center whitespace-nowrap">
+                      sekund pauza
+                    </label>
+                    <button 
+                      onClick={createRoom}
+                      disabled={!newRoomCode.trim() || !newRoomSetId}
+                      className={classNames("px-4 py-2 rounded-xl text-white", 
+                        (!newRoomCode.trim() || !newRoomSetId) ? "bg-slate-400" : "bg-emerald-600 hover:bg-emerald-500")}
+                    >
+                      Vytvořit místnost
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <button 
+                onClick={loadAllRooms} 
+                className="mb-4 px-4 py-2 rounded-xl bg-slate-200"
+              >
+                Obnovit seznam
+              </button>
+              
+              <div className="space-y-3">
+                {allRooms.map((room) => (
+                  <div key={room.id} className="border rounded-xl p-4">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <div className="font-mono text-lg">{room.id}</div>
+                        <div className="text-sm text-slate-500">
+                          Stav: {room.started ? "Zahájena" : "Čeká"} • 
+                          Vyřešeno: {Object.keys(room.solved || {}).length} otázek
+                        </div>
+                        {room.questionSetId && questionSets[room.questionSetId] && (
+                          <div className="text-sm text-emerald-600 mt-1">
+                            Přiřazená sada: {questionSets[room.questionSetId].name}
+                          </div>
+                        )}
+                        {room.completionMessage && (
+                          <div className="text-sm text-blue-600 mt-1">
+                            Hláška po dokončení: "{room.completionMessage}"
+                          </div>
+                        )}
+                        <div className="text-sm text-purple-600 mt-1">
+                          Penalizace: {room.penaltySeconds || 10} sekund
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => deleteRoom(room.id)}
+                        className="px-3 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700"
+                      >
+                        Smazat místnost
+                      </button>
+                    </div>
+                    
+                    {/* Přiřazení sady otázek a hlášky */}
+                    <div className="space-y-2">
+                      <div className="flex gap-2 items-center">
+                        <select 
+                          value={selectedSetForRoom[room.id] || room.questionSetId || ""}
+                          onChange={(e) => setSelectedSetForRoom({ ...selectedSetForRoom, [room.id]: e.target.value })}
+                          className="flex-1 border rounded-lg px-3 py-1"
+                        >
+                          <option value="">-- Vyberte sadu otázek --</option>
+                          {Object.entries(questionSets).map(([setId, setData]) => (
+                            <option key={setId} value={setId}>{setData.name} ({setData.questions?.length} otázek)</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex gap-2 items-center">
+                        <input 
+                          value={roomMessages[room.id] !== undefined ? roomMessages[room.id] : room.completionMessage || ""}
+                          onChange={(e) => setRoomMessages({ ...roomMessages, [room.id]: e.target.value })}
+                          className="flex-1 border rounded-lg px-3 py-1"
+                          placeholder="Hláška po dokončení"
+                        />
+                        <input 
+                          type="number"
+                          min="1"
+                          max="300"
+                          value={roomPenalties[room.id] !== undefined ? roomPenalties[room.id] : room.penaltySeconds || 10}
+                          onChange={(e) => setRoomPenalties({ ...roomPenalties, [room.id]: e.target.value })}
+                          className="w-20 border rounded-lg px-2 py-1"
+                          title="Penalizace v sekundách"
+                        />
+                        <span className="text-sm text-slate-600">s</span>
+                        <button 
+                          onClick={() => assignSetToRoom(room.id, selectedSetForRoom[room.id] || room.questionSetId)}
+                          disabled={!selectedSetForRoom[room.id] && !room.questionSetId}
+                          className={classNames("px-3 py-1 rounded-lg", 
+                            (!selectedSetForRoom[room.id] && !room.questionSetId) ? "bg-slate-200 text-slate-400" : "bg-emerald-600 text-white")}
+                        >
+                          Uložit změny
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                {allRooms.length === 0 && (
+                  <div className="text-center text-slate-500 py-8">
+                    Žádné místnosti nebyly nalezeny
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Fullscreen overlay pro otázky */}
+        {overlayQuestion !== null && effectiveQuestions[overlayQuestion] && (
+          <div className="fixed inset-0 bg-slate-900/95 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-auto">
+              <div className="p-6 sm:p-8">
+                <div className="flex justify-between items-start mb-6">
+                  <div className="text-lg font-bold text-slate-700">
+                    Otázka #{overlayQuestion + 1}
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setOverlayQuestion(null);
+                      setOverlayResult(null);
+                    }}
+                    className="px-3 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700"
+                  >
+                    ✕ Zavřít
+                  </button>
+                </div>
+                
+                <div className="mb-8">
+                  <div className="text-xl sm:text-2xl font-medium text-slate-900 leading-relaxed">
+                    {effectiveQuestions[overlayQuestion].q}
+                  </div>
+                </div>
+                
+                <div className="grid gap-4">
+                  {effectiveQuestions[overlayQuestion].options.map((option, idx) => (
+                    <button 
+                      key={idx}
+                      disabled={lockRemaining > 0}
+                      onClick={() => {
+                        submitAnswerOverlay(overlayQuestion, idx);
+                      }}
+                      className={classNames(
+                        "text-left px-6 py-4 rounded-xl border-2 text-lg transition-all",
+                        lockRemaining > 0 
+                          ? "bg-slate-100 cursor-not-allowed border-slate-200" 
+                          : "bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-400 hover:shadow-md"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-semibold text-slate-700">
+                          {String.fromCharCode(65 + idx)}
+                        </div>
+                        <div>{option}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                
+                {overlayResult === 'correct' && (
+                  <div className="mt-6 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-center font-semibold">
+                    ✅ Správně! Zavírá se za chvíli...
+                    {effectiveQuestions[overlayQuestion]?.comment && (
+                      <div className="mt-2 text-sm">{effectiveQuestions[overlayQuestion].comment}</div>
+                    )}
+                  </div>
+                )}
+                
+                
+                {lockRemaining > 0 && (
+                  <div className="mt-6 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-center">
+                    Pauza {lockRemaining}s – způsobil: <strong>{room?.lockedBy || "neznámý"}</strong>
+                    {overlayResult === 'wrong' && (
+                      <div className="mt-2 text-sm">Po uplynutí pauzy můžete odpovídat znovu.</div>
+                    )}
+                  </div>
+                )}
+                
+                <div className="mt-6 pt-4 border-t border-slate-200 text-center text-sm text-slate-500">
+                  💡 Tip: Odpovězte klávesami A, B, C, D nebo 1, 2, 3, 4 • ESC pro zavření
+                </div>
+              </div>
             </div>
           </div>
         )}
