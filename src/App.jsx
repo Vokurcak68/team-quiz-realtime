@@ -209,7 +209,7 @@ export default function TeamQuizRealtime() {
   const [taskCode, setTaskCode] = useState("");
   
   // Pevné kódy pro externí úkoly
-  const EXTERNAL_TASK_CODES = ["7823", "9156", "4792", "3648", "5937"];
+  const EXTERNAL_TASK_CODES = ["2354", "9156", "4792", "3648", "5937"];
 
   // UI / volby
   const [selectedIndex, setSelectedIndex] = useState(null);
@@ -1582,7 +1582,10 @@ export default function TeamQuizRealtime() {
         {showTaskModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl p-6 max-w-sm w-[90%]">
-              <h3 className="text-xl font-bold mb-2 text-red-600">🚨 Úkol číslo {(room?.completedTasks || 0) + 1}</h3>
+              <h3 className="text-xl font-bold mb-2 text-red-600">
+                🚨 Úkol číslo {(room?.completedTasks || 0) + 1} 
+                {(room?.completedTasks || 0) === 0 && " (7823)"}
+              </h3>
               <p className="text-sm text-slate-600 mb-4">
                 Váš tým má příliš mnoho špatných odpovědí ({room?.wrongAnswerCount || 0}). 
                 Dokončete externí úkol zadáním správného kódu.
