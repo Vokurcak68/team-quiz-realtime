@@ -69,6 +69,18 @@ function normalizeRoom(code) {
   return (code || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12) || "QUIZ";
 }
 
+function formatTime(seconds) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  } else {
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  }
+}
+
 function classNames(...xs) { return xs.filter(Boolean).join(" "); }
 
 function loadSavedConfig() {
@@ -187,8 +199,17 @@ export default function TeamQuizRealtime() {
   const [newRoomSetId, setNewRoomSetId] = useState("");
   const [newRoomMessage, setNewRoomMessage] = useState("");
   const [newRoomPenalty, setNewRoomPenalty] = useState("");
+  const [newRoomWrongLimit, setNewRoomWrongLimit] = useState("");
   const [roomMessages, setRoomMessages] = useState({});
   const [roomPenalties, setRoomPenalties] = useState({});
+  const [roomWrongLimits, setRoomWrongLimits] = useState({});
+  
+  // Externí úkoly - používáme jen lokální UI stavy, data bereme z Firebase
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [taskCode, setTaskCode] = useState("");
+  
+  // Pevné kódy pro externí úkoly
+  const EXTERNAL_TASK_CODES = ["7823", "9156", "4792", "3648", "5937"];
 
   // UI / volby
   const [selectedIndex, setSelectedIndex] = useState(null);
@@ -201,6 +222,11 @@ export default function TeamQuizRealtime() {
   const [overlayQuestion, setOverlayQuestion] = useState(null);
   const [overlayResult, setOverlayResult] = useState(null); // null, 'correct', 'wrong'
   const [flash, setFlash] = useState(null);
+  
+  // Časovač
+  const [gameStartTime, setGameStartTime] = useState(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
 
   // Chat / log
   const [chatMessages, setChatMessages] = useState([]);
@@ -217,6 +243,27 @@ export default function TeamQuizRealtime() {
   const lockTimerRef = useRef(null);
   const effectiveQuestionsRef = useRef([]);
   const fanfarePlayedRef = useRef(false); // pro listener z popupu (vyhne se TDZ)
+
+  // Externí úkoly - zjistí, zda je potřeba externí úkol
+  const needsExternalTask = useMemo(() => {
+    if (!room?.wrongAnswerLimit || room.wrongAnswerLimit <= 0) return false;
+    const currentCount = room?.wrongAnswerCount || 0;
+    const tasksCompleted = room?.completedTasks || 0;
+    
+    // Maximálně 5 externích úkolů
+    if (tasksCompleted >= 5) return false;
+    
+    const threshold = room.wrongAnswerLimit; // Vždy stejný threshold pro každý úkol
+    const needs = currentCount >= threshold;
+    
+    // Debug log
+    if (room?.wrongAnswerCount !== undefined) {
+      console.log(`External task check: count=${currentCount}, completed=${tasksCompleted}, limit=${room.wrongAnswerLimit}, threshold=${threshold}, needs=${needs}, maxReached=${tasksCompleted >= 5}`);
+    }
+    
+    return needs;
+  }, [room?.wrongAnswerCount, room?.wrongAnswerLimit, room?.completedTasks]);
+
 
   // Načti lokální sadu (fallback nebo uložený import)
   useEffect(() => {
@@ -256,9 +303,6 @@ export default function TeamQuizRealtime() {
     return () => clearInterval(lockTimerRef.current);
   }, [room?.lockedAt, room?.penaltySeconds]);
 
-  // Jakmile kdokoliv ve stejné místnosti spustí hru, automaticky přepni všechny do GAME
-  useEffect(() => { if (room?.started && stage !== "game") setStage("game"); }, [room?.started, stage]);
-
   // Odvozené otázky (definuj PŘED listenerem)
   const effectiveQuestions = useMemo(() => {
     const shared = room?.bank?.items;
@@ -277,9 +321,71 @@ export default function TeamQuizRealtime() {
   const solvedCount = Object.keys(solvedMap).length;
   const totalCount = effectiveQuestions.length || 0;
   const allSolved = totalCount > 0 && solvedCount >= totalCount;
+  
+  
+  // Listener pro externí úkoly
+  useEffect(() => {
+    if (needsExternalTask && !showTaskModal && stage === "game") {
+      setShowTaskModal(true);
+      setTaskCode("");
+    } else if (!needsExternalTask && showTaskModal) {
+      // Zavři modal, pokud už není potřeba úkol (někdo jiný ho dokončil)
+      setShowTaskModal(false);
+      setTaskCode("");
+    }
+  }, [needsExternalTask, showTaskModal, stage]);
+  
+  // Jakmile kdokoliv ve stejné místnosti spustí hru, automaticky přepni všechny do GAME a spusť časovač
+  useEffect(() => { 
+    if (room?.started && stage !== "game") {
+      setStage("game");
+      
+      // Pokud místnost má gameStartedAt, nastav časovač podle toho
+      if (room.gameStartedAt) {
+        const startMs = room.gameStartedAt?.toMillis ? room.gameStartedAt.toMillis() : room.gameStartedAt;
+        setGameStartTime(startMs);
+        setIsTimerRunning(true);
+        
+        // Vypočítej už uplynulý čas
+        const now = Date.now();
+        const elapsed = Math.floor((now - startMs) / 1000);
+        setElapsedTime(elapsed);
+      }
+    } 
+  }, [room?.started, room?.gameStartedAt, stage]);
 
-  // Pusť fanfáru po dokončení
-  useEffect(() => { if (allSolved) playFanfare(); }, [allSolved]);
+  // Časovač - aktualizace každou sekundu
+  useEffect(() => {
+    if (!isTimerRunning || !gameStartTime) return;
+    
+    // Okamžitá aktualizace
+    const now = Date.now();
+    const elapsed = Math.floor((now - gameStartTime) / 1000);
+    setElapsedTime(elapsed);
+    
+    // Pravidelné aktualizace
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const elapsed = Math.floor((now - gameStartTime) / 1000);
+      setElapsedTime(elapsed);
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [isTimerRunning, gameStartTime]);
+  
+  // Pusť fanfáru po dokončení a zastav časovač
+  useEffect(() => { 
+    if (allSolved && isTimerRunning) {
+      playFanfare();
+      setIsTimerRunning(false);
+      
+      // Ulož finální čas
+      if (gameStartTime) {
+        const finalTime = Math.floor((Date.now() - gameStartTime) / 1000);
+        setElapsedTime(finalTime);
+      }
+    }
+  }, [allSolved, isTimerRunning, gameStartTime]);
 
   // Listener pro pop‑up okna – přijímá odpovědi a vrací výsledek
   useEffect(() => {
@@ -307,7 +413,7 @@ export default function TeamQuizRealtime() {
       
       // Čísla 1-9 nebo písmena A-I pro odpovědi
       const question = effectiveQuestions[overlayQuestion];
-      if (!question || lockRemaining > 0) return;
+      if (!question || lockRemaining > 0 || needsExternalTask) return;
       
       let answerIndex = -1;
       if (e.key >= '1' && e.key <= '9') {
@@ -323,7 +429,7 @@ export default function TeamQuizRealtime() {
     
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [overlayQuestion, effectiveQuestions, lockRemaining]);
+  }, [overlayQuestion, effectiveQuestions, lockRemaining, needsExternalTask]);
 
   async function submitAnswerFromPopup(qIndex, choice, popwin) {
     try {
@@ -350,13 +456,20 @@ export default function TeamQuizRealtime() {
             const lockedAt = roomData?.lockedAt;
             const penaltyMs = (roomData?.penaltySeconds || 10) * 1000;
             const stillLocked = lockedAt && (lockedAt.toMillis ? (lockedAt.toMillis() + penaltyMs > now) : (lockedAt + penaltyMs > now));
-            if (!stillLocked) tx.update(rRef, { lockedAt: (await getFS(activeConfig)).fs.serverTimestamp(), lockedBy: nick });
+            if (!stillLocked) {
+              const newWrongCount = (roomData?.wrongAnswerCount || 0) + 1;
+              tx.update(rRef, { 
+                lockedAt: (await getFS(activeConfig)).fs.serverTimestamp(), 
+                lockedBy: nick,
+                wrongAnswerCount: newWrongCount
+              });
+            }
           });
         } catch (e) { console.error("Lock TX failed", e); }
         try {
           await fs.addDoc(fs.collection(db, "rooms", normalizeRoom(roomCode), "answers"),
             { qIndex, correct: false, authorId: myId, authorNick: nick, choice: choice, ts: fs.serverTimestamp() });
-        } catch (e) { console.error("Log wrong answer failed", e); }
+        } catch (e) { console.error("Log answer failed", e); }
         if (popwin && popwin.postMessage) popwin.postMessage({ type: 'popup-result', qIndex, correct: false }, '*');
       }
     } catch (e) { console.error(e); }
@@ -383,6 +496,40 @@ export default function TeamQuizRealtime() {
         setOverlayQuestion(null);
         setOverlayResult(null);
       }, 1500);
+    }
+  }
+
+  // Odeslání kódu externího úkolu
+  async function submitTaskCode() {
+    console.log("submitTaskCode called - new version with EXTERNAL_TASK_CODES");
+    const code = taskCode.trim();
+    if (!code) return;
+    
+    const taskNumber = (room?.completedTasks || 0) + 1;
+    const expectedCode = EXTERNAL_TASK_CODES[taskNumber - 1]; // -1 protože array je 0-indexed
+    
+    if (code === expectedCode) {
+      // Úspěšné ověření - resetuj počítadlo špatných odpovědí
+      try {
+        const { fs, db } = await getFS(activeConfig);
+        const roomRef = fs.doc(db, "rooms", normalizeRoom(roomCode));
+        await fs.updateDoc(roomRef, {
+          wrongAnswerCount: 0,
+          completedTasks: taskNumber
+        });
+      } catch (e) {
+        console.error("Chyba při resetování počítadla:", e);
+      }
+      
+      setShowTaskModal(false);
+      setTaskCode("");
+      setFlash(`Úkol ${taskNumber} byl dokončen! Můžete pokračovat v kvízu.`);
+      setTimeout(() => setFlash(null), 4000);
+    } else {
+      // Nesprávný kód
+      setFlash("Nesprávný kód. Zkuste to znovu.");
+      setTimeout(() => setFlash(null), 2000);
+      setTaskCode("");
     }
   }
 
@@ -504,7 +651,26 @@ export default function TeamQuizRealtime() {
       // Načti sady otázek z Firebase
       await loadQuestionSetsFromFirebase();
 
-      setStage("lobby");
+      // Pokud je hra již spuštěna, přejdi rovnou do hry
+      const currentRoomSnap = await fs.getDoc(roomRef);
+      if (currentRoomSnap.exists() && currentRoomSnap.data().started) {
+        setStage("game");
+        
+        // Nastav časovač podle uloženého času startu
+        const roomData = currentRoomSnap.data();
+        if (roomData.gameStartedAt) {
+          const startMs = roomData.gameStartedAt?.toMillis ? roomData.gameStartedAt.toMillis() : roomData.gameStartedAt;
+          setGameStartTime(startMs);
+          setIsTimerRunning(true);
+          
+          // Vypočítej už uplynulý čas
+          const now = Date.now();
+          const elapsed = Math.floor((now - startMs) / 1000);
+          setElapsedTime(elapsed);
+        }
+      } else {
+        setStage("lobby");
+      }
       const presence = setInterval(() => fs.updateDoc(playerRef, { lastSeen: fs.serverTimestamp() }).catch(() => {}), 5000);
       window.addEventListener("beforeunload", () => clearInterval(presence));
     } catch (e) { alert("Chyba připojení: " + e.message); } finally { setLoading(false); }
@@ -532,8 +698,19 @@ export default function TeamQuizRealtime() {
         toPublish = Array.isArray(localQuestions) && localQuestions.length ? localQuestions : FALLBACK_QUESTIONS;
       }
       
-      await fs.updateDoc(roomRef, { bank: { items: toPublish }, solved: {} });
+      // Ulož čas startu do Firebase a spusť lokální časovač
+      await fs.updateDoc(roomRef, { 
+        bank: { items: toPublish }, 
+        solved: {}, 
+        gameStartedAt: fs.serverTimestamp() 
+      });
       await fs.updateDoc(roomRef, { started: true });
+      
+      // Nastav lokální časovač
+      const now = Date.now();
+      setGameStartTime(now);
+      setElapsedTime(0);
+      setIsTimerRunning(true);
       setStage("game");
     } catch (e) { alert("Nelze spustit: " + e.message); }
   }
@@ -659,6 +836,11 @@ export default function TeamQuizRealtime() {
         updates.penaltySeconds = parseInt(roomPenalties[roomId]) || 10;
       }
       
+      // Pokud je zadán nový limit špatných odpovědí, ulož ho také
+      if (roomWrongLimits[roomId] !== undefined) {
+        updates.wrongAnswerLimit = parseInt(roomWrongLimits[roomId]) || 0;
+      }
+      
       await fs.updateDoc(fs.doc(db, "rooms", roomId), updates);
       setSelectedSetForRoom({ ...selectedSetForRoom, [roomId]: setId });
       alert(`Sada a nastavení byly přiřazeny místnosti ${roomId}`);
@@ -712,6 +894,7 @@ export default function TeamQuizRealtime() {
     }
   }
   
+  
   async function createRoom() {
     if (!newRoomCode.trim()) {
       alert("Zadejte kód místnosti");
@@ -734,7 +917,7 @@ export default function TeamQuizRealtime() {
         return;
       }
       
-      // Vytvoření nové místnosti s přiřazenou sadou, hláškou a penalizací
+      // Vytvoření nové místnosti s přiřazenou sadou, hláškou, penalizací a limitem špatných odpovědí
       await fs.setDoc(roomRef, {
         createdAt: fs.serverTimestamp(),
         started: false,
@@ -744,7 +927,10 @@ export default function TeamQuizRealtime() {
         solved: {},
         questionSetId: newRoomSetId,
         completionMessage: newRoomMessage.trim() || "Kód Vaší mise je 2289",
-        penaltySeconds: parseInt(newRoomPenalty) || 10
+        penaltySeconds: parseInt(newRoomPenalty) || 10,
+        wrongAnswerLimit: parseInt(newRoomWrongLimit) || 0,
+        wrongAnswerCount: 0,
+        completedTasks: 0
       });
       
       alert(`Místnost ${code} byla vytvořena se sadou otázek`);
@@ -752,6 +938,7 @@ export default function TeamQuizRealtime() {
       setNewRoomSetId("");
       setNewRoomMessage("");
       setNewRoomPenalty("");
+      setNewRoomWrongLimit("");
       await loadAllRooms();
     } catch (e) {
       alert("Chyba při vytváření místnosti: " + e.message);
@@ -784,6 +971,18 @@ export default function TeamQuizRealtime() {
             <div className="text-right text-sm">
               <div className="font-mono">Místnost: <span className="px-2 py-0.5 rounded bg-slate-200">{room.id}</span></div>
               <div>Vy: <span className="font-semibold">{nick || ""}</span></div>
+              {stage === "game" && (
+                <div className="mt-1">
+                  <div className="font-mono text-lg">
+                    ⏱️ <span className={classNames("font-bold", isTimerRunning ? "text-blue-600" : allSolved ? "text-emerald-600" : "text-slate-600")}>
+                      {formatTime(elapsedTime)}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {allSolved ? "Dokončeno!" : isTimerRunning ? "Běží..." : "Čeká"}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </header>
@@ -828,6 +1027,7 @@ export default function TeamQuizRealtime() {
                 </div>
               </div>
             )}
+
           </div>
         )}
 
@@ -848,7 +1048,7 @@ export default function TeamQuizRealtime() {
                 )}
               </div>
               <div className="mt-4 flex items-center gap-3">
-                <button disabled={!canStart} onClick={startGame} className={classNames("px-4 py-2 rounded-2xl text-white", canStart ? "bg-emerald-600 hover:bg-emerald-500" : "bg-slate-400")}>Start</button>
+                <button disabled={!canStart} onClick={startGame} className={classNames("px-4 py-2 rounded-2xl text-white", canStart ? "bg-emerald-600 hover:bg-emerald-500" : "bg-slate-400")}>⏱️ Start (spustí časovač)</button>
                 {!canStart && <span className="text-sm text-slate-500">Potřeba alespoň 2 hráči a nezahájená hra.</span>}
               </div>
             </div>
@@ -901,19 +1101,30 @@ export default function TeamQuizRealtime() {
                 </div>
               )}
 
+              {/* External task warning */}
+              {needsExternalTask && (
+                <div className="mb-3 px-3 py-2 rounded-xl bg-red-50 border border-red-200 text-red-900 text-sm">
+                  <strong>🚨 Externí úkol #{(room?.completedTasks || 0) + 1} je vyžadován!</strong><br />
+                  Kvíz je blokován do dokončení úkolu. Počet špatných odpovědí: {room?.wrongAnswerCount || 0}
+                </div>
+              )}
+
               {/* Grid otázek */}
               <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(2.5rem,1fr))] sm:[grid-template-columns:repeat(auto-fill,minmax(2.75rem,1fr))]">
                 {effectiveQuestions.map((q, i) => {
                   const done = !!solvedMap[i];
                   if (showOnlyUnsolved && done) return null;
                   return (
-                    <button key={i} disabled={lockRemaining > 0}
+                    <button key={i} disabled={lockRemaining > 0 || needsExternalTask}
                       className={classNames(
                         "aspect-square w-full rounded-lg border text-sm font-medium flex items-center justify-center quiz-num",
-                        done ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-white border-slate-200 hover:bg-slate-50",
-                        lockRemaining > 0 && "opacity-60 cursor-not-allowed"
+                        done ? "bg-emerald-50 border-emerald-200 text-emerald-700" : 
+                        needsExternalTask ? "bg-red-50 border-red-200 text-red-600" :
+                        "bg-white border-slate-200 hover:bg-slate-50",
+                        (lockRemaining > 0 || needsExternalTask) && "opacity-60 cursor-not-allowed"
                       )}
                       onClick={() => {
+                        if (needsExternalTask) return;
                         if (displayMode === "popup") {
                           openQuestionPopup(i);
                         } else if (displayMode === "overlay") {
@@ -922,23 +1133,23 @@ export default function TeamQuizRealtime() {
                           setSelectedIndex(i);
                         }
                       }}
-                      title={q.q}
+                      title={needsExternalTask ? "Dokončete externí úkol" : q.q}
                     >{i + 1}</button>
                   );
                 })}
               </div>
 
               {/* Inline panel otázek (když je inline režim) */}
-              {displayMode === "inline" && selectedIndex != null && effectiveQuestions[selectedIndex] && (
+              {displayMode === "inline" && selectedIndex != null && effectiveQuestions[selectedIndex] && !needsExternalTask && (
                 <div className="mt-5 border rounded-2xl p-4">
                   <div className="text-sm text-slate-500 mb-1">Otázka #{selectedIndex + 1}</div>
                   <div className="font-medium mb-3">{effectiveQuestions[selectedIndex].q}</div>
                   <div className="grid gap-2">
                     {effectiveQuestions[selectedIndex].options.map((t, idx) => (
-                      <button key={idx} disabled={lockRemaining > 0}
+                      <button key={idx} disabled={lockRemaining > 0 || needsExternalTask}
                         onClick={() => submitAnswerInline(selectedIndex, idx)}
                         className={classNames("text-left px-3 py-2 rounded-xl border",
-                          lockRemaining > 0 ? "bg-slate-100 cursor-not-allowed" : "bg-white hover:bg-slate-50")}
+                          (lockRemaining > 0 || needsExternalTask) ? "bg-slate-100 cursor-not-allowed" : "bg-white hover:bg-slate-50")}
                       >{t}</button>
                     ))}
                   </div>
@@ -949,8 +1160,13 @@ export default function TeamQuizRealtime() {
               <div className="mt-5 text-sm text-slate-600">
                 Vyřešeno: <strong>{solvedCount}/{totalCount}</strong>
                 {allSolved && (
-                  <div className="mission-banner mt-3 w-full text-center text-2xl sm:text-4xl font-extrabold tracking-wide text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3">
-                    {room?.completionMessage || "Kód Vaší mise je 2289"}
+                  <div className="mission-banner mt-3 w-full text-center bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3">
+                    <div className="text-2xl sm:text-4xl font-extrabold tracking-wide text-emerald-800 mb-2">
+                      {room?.completionMessage || "Kód Vaší mise je 2289"}
+                    </div>
+                    <div className="text-lg font-semibold text-emerald-700">
+                      🏆 Dokončeno za: {formatTime(elapsedTime)}
+                    </div>
                   </div>
                 )}
               </div>
@@ -996,6 +1212,183 @@ export default function TeamQuizRealtime() {
               <button onClick={() => setStage("intro")} className="px-4 py-2 rounded-xl bg-slate-200">Zpět</button>
             </div>
             
+            {/* Správa místností */}
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold mb-4">Správa místností</h3>
+              
+              {/* Vytvoření nové místnosti */}
+              <div className="border rounded-xl p-4 mb-4 bg-emerald-50">
+                <div className="mb-3">
+                  <label className="text-sm text-slate-600 font-semibold">Vytvořit novou místnost:</label>
+                </div>
+                <div className="grid gap-3">
+                  <div className="flex gap-3">
+                    <input 
+                      value={newRoomCode}
+                      onChange={(e) => setNewRoomCode(e.target.value.toUpperCase())}
+                      className="flex-1 border rounded-xl px-3 py-2"
+                      placeholder="Kód místnosti (např. QUIZ123)"
+                    />
+                    <select 
+                      value={newRoomSetId}
+                      onChange={(e) => setNewRoomSetId(e.target.value)}
+                      className="flex-1 border rounded-xl px-3 py-2"
+                    >
+                      <option value="">-- Vyberte sadu otázek --</option>
+                      {Object.entries(questionSets).map(([setId, setData]) => (
+                        <option key={setId} value={setId}>{setData.name} ({setData.questions?.length} otázek)</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex gap-3">
+                    <input 
+                      value={newRoomMessage}
+                      onChange={(e) => setNewRoomMessage(e.target.value)}
+                      className="flex-1 border rounded-xl px-3 py-2"
+                      placeholder="Hláška po dokončení kvízu (nepovinné)"
+                    />
+                    <input 
+                      type="number"
+                      min="1"
+                      max="300"
+                      value={newRoomPenalty}
+                      onChange={(e) => setNewRoomPenalty(e.target.value)}
+                      className="w-24 border rounded-xl px-3 py-2"
+                      placeholder="10"
+                      title="Penalizace v sekundách za špatnou odpověď"
+                    />
+                    <label className="text-sm text-slate-600 flex items-center whitespace-nowrap">
+                      s pauza
+                    </label>
+                    <input 
+                      type="number"
+                      min="0"
+                      max="50"
+                      value={newRoomWrongLimit}
+                      onChange={(e) => setNewRoomWrongLimit(e.target.value)}
+                      className="w-24 border rounded-xl px-3 py-2"
+                      placeholder="0"
+                      title="Po kolika špatných odpovědích vyžadovat externí úkol (0 = vypnuto)"
+                    />
+                    <label className="text-sm text-slate-600 flex items-center whitespace-nowrap">
+                      špatných = úkol
+                    </label>
+                    <button 
+                      onClick={createRoom}
+                      disabled={!newRoomCode.trim() || !newRoomSetId}
+                      className={classNames("px-4 py-2 rounded-xl text-white", 
+                        (!newRoomCode.trim() || !newRoomSetId) ? "bg-slate-400" : "bg-emerald-600 hover:bg-emerald-500")}
+                    >
+                      Vytvořit místnost
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <button 
+                onClick={loadAllRooms} 
+                className="mb-4 px-4 py-2 rounded-xl bg-slate-200"
+              >
+                Obnovit seznam
+              </button>
+              
+              <div className="space-y-3">
+                {allRooms.map((room) => (
+                  <div key={room.id} className="border rounded-xl p-4">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <div className="font-mono text-lg">{room.id}</div>
+                        <div className="text-sm text-slate-500">
+                          Stav: {room.started ? "Zahájena" : "Čeká"} • 
+                          Vyřešeno: {Object.keys(room.solved || {}).length} otázek
+                        </div>
+                        {room.questionSetId && questionSets[room.questionSetId] && (
+                          <div className="text-sm text-emerald-600 mt-1">
+                            Přiřazená sada: {questionSets[room.questionSetId].name}
+                          </div>
+                        )}
+                        {room.completionMessage && (
+                          <div className="text-sm text-blue-600 mt-1">
+                            Hláška po dokončení: "{room.completionMessage}"
+                          </div>
+                        )}
+                        <div className="text-sm text-purple-600 mt-1">
+                          Penalizace: {room.penaltySeconds || 10} sekund
+                        </div>
+                        <div className="text-sm text-orange-600 mt-1">
+                          Externí úkol po: {room.wrongAnswerLimit || 0} špatných odpovědích {room.wrongAnswerLimit ? `(${room.wrongAnswerCount || 0}/${room.wrongAnswerLimit})` : "(vypnuto)"}
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => deleteRoom(room.id)}
+                        className="px-3 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700"
+                      >
+                        Smazat místnost
+                      </button>
+                    </div>
+                    
+                    {/* Přiřazení sady otázek a hlášky */}
+                    <div className="space-y-2">
+                      <div className="flex gap-2 items-center">
+                        <select 
+                          value={selectedSetForRoom[room.id] || room.questionSetId || ""}
+                          onChange={(e) => setSelectedSetForRoom({ ...selectedSetForRoom, [room.id]: e.target.value })}
+                          className="flex-1 border rounded-lg px-3 py-1"
+                        >
+                          <option value="">-- Vyberte sadu otázek --</option>
+                          {Object.entries(questionSets).map(([setId, setData]) => (
+                            <option key={setId} value={setId}>{setData.name} ({setData.questions?.length} otázek)</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex gap-2 items-center">
+                        <input 
+                          value={roomMessages[room.id] !== undefined ? roomMessages[room.id] : room.completionMessage || ""}
+                          onChange={(e) => setRoomMessages({ ...roomMessages, [room.id]: e.target.value })}
+                          className="flex-1 border rounded-lg px-3 py-1"
+                          placeholder="Hláška po dokončení"
+                        />
+                        <input 
+                          type="number"
+                          min="1"
+                          max="300"
+                          value={roomPenalties[room.id] !== undefined ? roomPenalties[room.id] : room.penaltySeconds || 10}
+                          onChange={(e) => setRoomPenalties({ ...roomPenalties, [room.id]: e.target.value })}
+                          className="w-20 border rounded-lg px-2 py-1"
+                          title="Penalizace v sekundách"
+                        />
+                        <span className="text-sm text-slate-600">s</span>
+                        <input 
+                          type="number"
+                          min="0"
+                          max="50"
+                          value={roomWrongLimits[room.id] !== undefined ? roomWrongLimits[room.id] : room.wrongAnswerLimit || 0}
+                          onChange={(e) => setRoomWrongLimits({ ...roomWrongLimits, [room.id]: e.target.value })}
+                          className="w-16 border rounded-lg px-2 py-1"
+                          title="Externí úkol po X špatných odpovědích"
+                        />
+                        <span className="text-sm text-slate-600">šp.=úkol</span>
+                        <button 
+                          onClick={() => assignSetToRoom(room.id, selectedSetForRoom[room.id] || room.questionSetId)}
+                          disabled={!selectedSetForRoom[room.id] && !room.questionSetId}
+                          className={classNames("px-3 py-1 rounded-lg", 
+                            (!selectedSetForRoom[room.id] && !room.questionSetId) ? "bg-slate-200 text-slate-400" : "bg-emerald-600 text-white")}
+                        >
+                          Uložit změny
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                {allRooms.length === 0 && (
+                  <div className="text-center text-slate-500 py-8">
+                    Žádné místnosti nebyly nalezeny
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Správa sad otázek */}
             <div className="mb-8">
               <h3 className="text-lg font-semibold mb-4">Správa sad otázek</h3>
@@ -1102,161 +1495,11 @@ export default function TeamQuizRealtime() {
               </div>
             </div>
             
-            {/* Správa místností */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Správa místností</h3>
-              
-              {/* Vytvoření nové místnosti */}
-              <div className="border rounded-xl p-4 mb-4 bg-emerald-50">
-                <div className="mb-3">
-                  <label className="text-sm text-slate-600 font-semibold">Vytvořit novou místnost:</label>
-                </div>
-                <div className="grid gap-3">
-                  <div className="flex gap-3">
-                    <input 
-                      value={newRoomCode}
-                      onChange={(e) => setNewRoomCode(e.target.value.toUpperCase())}
-                      className="flex-1 border rounded-xl px-3 py-2"
-                      placeholder="Kód místnosti (např. QUIZ123)"
-                    />
-                    <select 
-                      value={newRoomSetId}
-                      onChange={(e) => setNewRoomSetId(e.target.value)}
-                      className="flex-1 border rounded-xl px-3 py-2"
-                    >
-                      <option value="">-- Vyberte sadu otázek --</option>
-                      {Object.entries(questionSets).map(([setId, setData]) => (
-                        <option key={setId} value={setId}>{setData.name} ({setData.questions?.length} otázek)</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex gap-3">
-                    <input 
-                      value={newRoomMessage}
-                      onChange={(e) => setNewRoomMessage(e.target.value)}
-                      className="flex-1 border rounded-xl px-3 py-2"
-                      placeholder="Hláška po dokončení kvízu (nepovinné)"
-                    />
-                    <input 
-                      type="number"
-                      min="1"
-                      max="300"
-                      value={newRoomPenalty}
-                      onChange={(e) => setNewRoomPenalty(e.target.value)}
-                      className="w-24 border rounded-xl px-3 py-2"
-                      placeholder="10"
-                      title="Penalizace v sekundách za špatnou odpověď"
-                    />
-                    <label className="text-sm text-slate-600 flex items-center whitespace-nowrap">
-                      sekund pauza
-                    </label>
-                    <button 
-                      onClick={createRoom}
-                      disabled={!newRoomCode.trim() || !newRoomSetId}
-                      className={classNames("px-4 py-2 rounded-xl text-white", 
-                        (!newRoomCode.trim() || !newRoomSetId) ? "bg-slate-400" : "bg-emerald-600 hover:bg-emerald-500")}
-                    >
-                      Vytvořit místnost
-                    </button>
-                  </div>
-                </div>
-              </div>
-              
-              <button 
-                onClick={loadAllRooms} 
-                className="mb-4 px-4 py-2 rounded-xl bg-slate-200"
-              >
-                Obnovit seznam
-              </button>
-              
-              <div className="space-y-3">
-                {allRooms.map((room) => (
-                  <div key={room.id} className="border rounded-xl p-4">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <div className="font-mono text-lg">{room.id}</div>
-                        <div className="text-sm text-slate-500">
-                          Stav: {room.started ? "Zahájena" : "Čeká"} • 
-                          Vyřešeno: {Object.keys(room.solved || {}).length} otázek
-                        </div>
-                        {room.questionSetId && questionSets[room.questionSetId] && (
-                          <div className="text-sm text-emerald-600 mt-1">
-                            Přiřazená sada: {questionSets[room.questionSetId].name}
-                          </div>
-                        )}
-                        {room.completionMessage && (
-                          <div className="text-sm text-blue-600 mt-1">
-                            Hláška po dokončení: "{room.completionMessage}"
-                          </div>
-                        )}
-                        <div className="text-sm text-purple-600 mt-1">
-                          Penalizace: {room.penaltySeconds || 10} sekund
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => deleteRoom(room.id)}
-                        className="px-3 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700"
-                      >
-                        Smazat místnost
-                      </button>
-                    </div>
-                    
-                    {/* Přiřazení sady otázek a hlášky */}
-                    <div className="space-y-2">
-                      <div className="flex gap-2 items-center">
-                        <select 
-                          value={selectedSetForRoom[room.id] || room.questionSetId || ""}
-                          onChange={(e) => setSelectedSetForRoom({ ...selectedSetForRoom, [room.id]: e.target.value })}
-                          className="flex-1 border rounded-lg px-3 py-1"
-                        >
-                          <option value="">-- Vyberte sadu otázek --</option>
-                          {Object.entries(questionSets).map(([setId, setData]) => (
-                            <option key={setId} value={setId}>{setData.name} ({setData.questions?.length} otázek)</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="flex gap-2 items-center">
-                        <input 
-                          value={roomMessages[room.id] !== undefined ? roomMessages[room.id] : room.completionMessage || ""}
-                          onChange={(e) => setRoomMessages({ ...roomMessages, [room.id]: e.target.value })}
-                          className="flex-1 border rounded-lg px-3 py-1"
-                          placeholder="Hláška po dokončení"
-                        />
-                        <input 
-                          type="number"
-                          min="1"
-                          max="300"
-                          value={roomPenalties[room.id] !== undefined ? roomPenalties[room.id] : room.penaltySeconds || 10}
-                          onChange={(e) => setRoomPenalties({ ...roomPenalties, [room.id]: e.target.value })}
-                          className="w-20 border rounded-lg px-2 py-1"
-                          title="Penalizace v sekundách"
-                        />
-                        <span className="text-sm text-slate-600">s</span>
-                        <button 
-                          onClick={() => assignSetToRoom(room.id, selectedSetForRoom[room.id] || room.questionSetId)}
-                          disabled={!selectedSetForRoom[room.id] && !room.questionSetId}
-                          className={classNames("px-3 py-1 rounded-lg", 
-                            (!selectedSetForRoom[room.id] && !room.questionSetId) ? "bg-slate-200 text-slate-400" : "bg-emerald-600 text-white")}
-                        >
-                          Uložit změny
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                
-                {allRooms.length === 0 && (
-                  <div className="text-center text-slate-500 py-8">
-                    Žádné místnosti nebyly nalezeny
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
         )}
         
         {/* Fullscreen overlay pro otázky */}
-        {overlayQuestion !== null && effectiveQuestions[overlayQuestion] && (
+        {overlayQuestion !== null && effectiveQuestions[overlayQuestion] && !needsExternalTask && (
           <div className="fixed inset-0 bg-slate-900/95 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-auto">
               <div className="p-6 sm:p-8">
@@ -1285,13 +1528,15 @@ export default function TeamQuizRealtime() {
                   {effectiveQuestions[overlayQuestion].options.map((option, idx) => (
                     <button 
                       key={idx}
-                      disabled={lockRemaining > 0}
+                      disabled={lockRemaining > 0 || needsExternalTask}
                       onClick={() => {
-                        submitAnswerOverlay(overlayQuestion, idx);
+                        if (!needsExternalTask) {
+                          submitAnswerOverlay(overlayQuestion, idx);
+                        }
                       }}
                       className={classNames(
                         "text-left px-6 py-4 rounded-xl border-2 text-lg transition-all",
-                        lockRemaining > 0 
+                        (lockRemaining > 0 || needsExternalTask)
                           ? "bg-slate-100 cursor-not-allowed border-slate-200" 
                           : "bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-400 hover:shadow-md"
                       )}
@@ -1328,6 +1573,33 @@ export default function TeamQuizRealtime() {
                 <div className="mt-6 pt-4 border-t border-slate-200 text-center text-sm text-slate-500">
                   💡 Tip: Odpovězte klávesami A, B, C, D nebo 1, 2, 3, 4 • ESC pro zavření
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* External task modal - zobrazí se v jakémkoliv stage */}
+        {showTaskModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 max-w-sm w-[90%]">
+              <h3 className="text-xl font-bold mb-2 text-red-600">🚨 Úkol číslo {(room?.completedTasks || 0) + 1}</h3>
+              <p className="text-sm text-slate-600 mb-4">
+                Váš tým má příliš mnoho špatných odpovědí ({room?.wrongAnswerCount || 0}). 
+                Dokončete externí úkol zadáním správného kódu.
+              </p>
+              <input 
+                type="text" 
+                value={taskCode} 
+                onChange={(e) => setTaskCode(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && submitTaskCode()}
+                className="w-full border rounded-xl px-3 py-2 mb-4"
+                placeholder="Zadejte 4-místný kód"
+                autoFocus
+              />
+              <div className="flex gap-3 justify-end">
+                <button onClick={submitTaskCode} className="px-4 py-2 rounded-xl bg-red-600 text-white">
+                  Potvrdit kód
+                </button>
               </div>
             </div>
           </div>
