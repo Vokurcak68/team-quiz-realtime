@@ -180,15 +180,41 @@ async function generateStatisticsPDF(data) {
         </table>
         
         ${data.answersList && data.answersList.length > 0 ? `
-          <h2>📋 Detailní log odpovědí</h2>
-          <div style="font-size: 12px;">
-            ${data.answersList.slice(0, 50).map((answer, index) => {
-              const timeStr = answer.ts?.toDate ? answer.ts.toDate().toLocaleTimeString('cs-CZ') : 
-                             answer.ts?.seconds ? new Date(answer.ts.seconds * 1000).toLocaleTimeString('cs-CZ') : 'N/A';
-              const result = answer.correct ? '✅' : '❌';
-              return `<div class="log">${index + 1}. ${timeStr} | ${answer.authorNick || 'N/A'} | ${result} | ${answer.answer || 'N/A'}</div>`;
-            }).join('')}
-          </div>
+          <h2>📋 Detailní log odpovědí (prvních 50)</h2>
+          <table style="font-size: 11px;">
+            <thead>
+              <tr>
+                <th style="width: 30px;">#</th>
+                <th style="width: 80px;">Čas</th>
+                <th style="width: 100px;">Hráč</th>
+                <th style="width: 50px;">Otázka</th>
+                <th style="width: 40px;">Výsledek</th>
+                <th>Odpověď</th>
+                <th>Komentář</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.answersList.slice(0, 50).map((answer, index) => {
+                const timeStr = answer.ts?.toDate ? answer.ts.toDate().toLocaleTimeString('cs-CZ') : 
+                               answer.ts?.seconds ? new Date(answer.ts.seconds * 1000).toLocaleTimeString('cs-CZ') : 'N/A';
+                const result = answer.correct ? '✅' : '❌';
+                const questionNum = answer.qIndex !== undefined ? `Q${answer.qIndex + 1}` : 'N/A';
+                const comment = answer.comment || '';
+                const answerText = answer.choice || answer.answer || 'N/A';
+                return `
+                  <tr>
+                    <td>${index + 1}</td>
+                    <td>${timeStr}</td>
+                    <td>${answer.authorNick || 'N/A'}</td>
+                    <td>${questionNum}</td>
+                    <td>${result}</td>
+                    <td>${answerText}</td>
+                    <td>${comment}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
         ` : ''}
       </body>
       </html>
